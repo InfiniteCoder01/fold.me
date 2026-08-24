@@ -1,4 +1,3 @@
-import gleam/float
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -37,19 +36,19 @@ fn reflect(point: Vec2, line: #(Float, Float, Float)) -> Vec2 {
 }
 
 pub type Layer {
-  Layer(points: List(Vec2), folds: List(Bool))
+  Layer(points: List(Vec2), animation: List(Vec2))
   Fold(top: Layer, bottom: Layer, fold: #(Vec2, Vec2))
 }
 
 fn split(
   layer: Layer,
   fold_line: #(Float, Float, Float),
+  allow_partial: Bool,
 ) -> #(Option(Layer), Option(Layer), Option(#(Vec2, Vec2))) {
   case layer {
-    Layer(points:, folds:) -> {
+    Layer(points:, ..) -> {
       // Split the points into groups depending on above/below the line
-      let polys =
-        list.chunk(list.zip(points, folds), fn(e) { above_line(e.0, fold_line) })
+      let polys = list.chunk(points, above_line(_, fold_line))
       let polys = case polys {
         [a, b, c] -> [b, list.append(c, a)]
         polys -> polys
@@ -58,7 +57,7 @@ fn split(
       // Make sure first group is above the line (ordering)
       let polys = case polys {
         [[p1, ..] as first, ..rest] ->
-          case above_line(p1.0, fold_line) {
+          case above_line(p1, fold_line) {
             True -> polys
             False -> list.append(rest, [first])
           }
@@ -67,7 +66,7 @@ fn split(
 
       case polys {
         // The whole layer was on one side of the line
-        [[#(p1, _), ..]] ->
+        [[p1, ..]] ->
           case above_line(p1, fold_line) {
             True -> #(Some(layer), None, None)
             False -> #(None, Some(layer), None)
@@ -75,24 +74,20 @@ fn split(
 
         // Split!
         [a, b] -> {
-          let #(a, afolds) = list.unzip(a)
-          let #(b, bfolds) = list.unzip(b)
           let a1 = result.lazy_unwrap(list.first(a), fn() { panic })
           let a2 = result.lazy_unwrap(list.last(a), fn() { panic })
           let b1 = result.lazy_unwrap(list.first(b), fn() { panic })
           let b2 = result.lazy_unwrap(list.last(b), fn() { panic })
           let p1 = line_intersection(points2line(a1, b2), fold_line)
           let p2 = line_intersection(points2line(a2, b1), fold_line)
-          let afolds2 = result.lazy_unwrap(list.first(afolds), fn() { panic })
-          let bfolds2 = result.lazy_unwrap(list.first(bfolds), fn() { panic })
           #(
             Some(Layer(
               points: list.flatten([[p1], a, [p2]]),
-              folds: list.flatten([[True], afolds, [bfolds2]]),
+              animation: list.flatten([[p1], a, [p2]]),
             )),
             Some(Layer(
               points: list.flatten([[p2], b, [p1]]),
-              folds: list.flatten([[True], bfolds, [afolds2]]),
+              animation: list.flatten([[p2], b, [p1]]),
             )),
             Some(#(p1, p2)),
           )
@@ -101,31 +96,35 @@ fn split(
       }
     }
 
-    Fold(top:, bottom:, fold:) -> {
-      let fold = case above_line(fold.0, fold_line) {
-        True -> fold
-        False -> #(fold.1, fold.0)
+    Fold(top:, bottom:, fold: current_fold) -> {
+      let current_fold = case above_line(current_fold.0, fold_line) {
+        True -> current_fold
+        False -> #(current_fold.1, current_fold.0)
       }
 
       // Split both layers into top and bottom sections
-      let #(ltop, lbottom, fold1) = {
-        let #(top, bottom, fold1) = split(top, fold_line)
-        #(option.values([top]), option.values([bottom]), fold1)
+      let #(ltop, lbottom, new_fold) = {
+        let #(top, bottom, new_fold) = split(top, fold_line, allow_partial)
+        #(option.values([top]), option.values([bottom]), new_fold)
       }
 
       // Weather we only need to fold the top part of this fold
       // (the fold line of this fold is below fold_line)
-      let partial_fold = !above_line(fold.0, fold_line) && !list.is_empty(ltop)
+      let partial_fold =
+        !above_line(current_fold.0, fold_line)
+        && !list.is_empty(ltop)
+        && allow_partial
 
-      let #(ltop, lbottom, fold1) = case partial_fold {
-        True -> #(ltop, list.append(lbottom, [bottom]), fold1)
+      let #(ltop, lbottom, new_fold) = case partial_fold {
+        True -> #(ltop, list.append(lbottom, [bottom]), new_fold)
         False -> {
-          let #(top, bottom, fold2) = split(bottom, fold_line)
+          let #(top, bottom, new_fold2) =
+            split(bottom, fold_line, list.is_empty(ltop) && allow_partial)
           #(
             list.append(ltop, option.values([top])),
             list.append(lbottom, option.values([bottom])),
             // Find the biggest fold line segment
-            case fold1, fold2 {
+            case new_fold, new_fold2 {
               Some(fold1), Some(fold2) -> {
                 let eval = fn(p: #(_, _)) {
                   fold_line.1 *. p.0 -. fold_line.0 *. p.1 +. fold_line.2
@@ -151,24 +150,39 @@ fn split(
         }
       }
 
-      // Intersection between fold_line and this fold
-      let intersection =
-        line_intersection(points2line(fold.0, fold.1), fold_line)
+      // Compute fold line segments for new split layers
+      let #(fold_top, fold_bottom) = case
+        above_line(current_fold.0, fold_line),
+        above_line(current_fold.1, fold_line)
+      {
+        True, True -> #(current_fold, option.unwrap(new_fold, current_fold))
+        True, False -> {
+          // Intersection between fold_line and this fold
+          let intersection =
+            line_intersection(
+              points2line(current_fold.0, current_fold.1),
+              fold_line,
+            )
+          #(#(current_fold.0, intersection), #(intersection, current_fold.1))
+        }
+        False, True -> panic as "sorted"
+        False, False -> #(option.unwrap(new_fold, current_fold), current_fold)
+      }
 
       #(
         case ltop {
           [] -> None
           [layer] -> Some(layer)
-          [top, bottom] -> Some(Fold(top, bottom, #(fold.0, intersection)))
+          [top, bottom] -> Some(Fold(top, bottom, fold_top))
           _ -> panic
         },
         case lbottom {
           [] -> None
           [layer] -> Some(layer)
-          [top, bottom] -> Some(Fold(top, bottom, #(intersection, fold.1)))
+          [top, bottom] -> Some(Fold(top, bottom, fold_bottom))
           _ -> panic
         },
-        fold1,
+        new_fold,
       )
     }
   }
@@ -187,7 +201,7 @@ pub fn flip(layer: Layer, flip_line: #(Float, Float, Float)) -> Layer {
 }
 
 pub fn fold(layer: Layer, fold_line: #(Float, Float, Float)) -> Layer {
-  case echo split(layer, fold_line) {
+  case split(layer, fold_line, True) {
     #(Some(top), Some(bottom), Some(flip1)) ->
       Fold(flip(top, fold_line), bottom, flip1)
     #(Some(top), None, _) -> flip(top, fold_line)
@@ -195,34 +209,6 @@ pub fn fold(layer: Layer, fold_line: #(Float, Float, Float)) -> Layer {
     _ -> panic
   }
 }
-
-// fn triangle_area(p1: Vec2, p2: Vec2, p3: Vec2) {
-//   float.absolute_value(
-//     p1.0
-//     *. { p2.1 -. p3.1 }
-//     +. p2.0
-//     *. { p3.1 -. p1.1 }
-//     +. p3.0
-//     *. { p1.1 -. p2.1 },
-//   )
-//   /. 2.0
-// }
-
-// fn layer_area(layer: Layer) -> Float {
-//   list.index_fold(
-//     layer.points,
-//     #(0.0, #(0.0, 0.0), #(0.0, 0.0)),
-//     fn(state, p3, index) {
-//       let #(area, p1, p2) = state
-//       case index {
-//         0 | 1 -> #(area, p2, p3)
-//         _ -> {
-//           #(area +. triangle_area(p1, p2, p3), p2, p3)
-//         }
-//       }
-//     },
-//   ).0
-// }
 
 // --------------------------------
 pub opaque type Paper {
@@ -241,7 +227,12 @@ pub fn init() -> Paper {
         #(800.0, 700.0),
         #(500.0, 700.0),
       ],
-      folds: [False, False, False, False],
+      animation: [
+        #(650.0, 450.0),
+        #(650.0, 450.0),
+        #(650.0, 450.0),
+        #(650.0, 450.0),
+      ],
     ),
   )
 }
@@ -307,6 +298,29 @@ pub fn init() -> Paper {
 //   )
 // }
 
+fn update_animation(layer: Layer) -> Layer {
+  case layer {
+    Layer(points:, animation:) ->
+      Layer(
+        points,
+        list.map(list.zip(points, animation), fn(e) {
+          let #(target, p) = e
+          // p + (target - p) * 0.1
+          #(
+            p.0 +. { target.0 -. p.0 } *. 0.1,
+            p.1 +. { target.1 -. p.1 } *. 0.1,
+          )
+        }),
+      )
+    Fold(top:, bottom:, ..) ->
+      Fold(
+        ..layer,
+        top: update_animation(top),
+        bottom: update_animation(bottom),
+      )
+  }
+}
+
 pub fn update(state: Paper, event: event.Event) -> Paper {
   case event {
     event.KeyboardPressed(event.KeySpace) -> Paper(..state, space: True)
@@ -322,13 +336,14 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
         }
         state -> state
       }
+    event.Tick(_) -> Paper(..state, layers: update_animation(state.layers))
     _ -> state
   }
 }
 
 fn draw_layer(layer: Layer) -> p.Picture {
   case layer {
-    Layer(points: [p1, p2, ..rest], ..) ->
+    Layer(animation: [p1, p2, ..rest], ..) ->
       p.path(
         p1,
         list.flatten([
