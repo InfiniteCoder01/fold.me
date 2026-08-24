@@ -260,32 +260,22 @@ pub fn init() -> Paper {
     layers: Stack([
       Layer(
         points: [
-          #(500.0, 200.0),
-          #(800.0, 200.0),
-          #(800.0, 700.0),
-          #(500.0, 700.0),
+          #(-150.0, -250.0),
+          #(150.0, -250.0),
+          #(150.0, 250.0),
+          #(-150.0, 250.0),
         ],
-        animation: [
-          #(650.0, 450.0),
-          #(650.0, 450.0),
-          #(650.0, 450.0),
-          #(650.0, 450.0),
-        ],
+        animation: list.repeat(#(0.0, 0.0), 4),
         color: p.colour_hex("#F1E9D2"),
       ),
       Layer(
         points: [
-          #(550.0, 250.0),
-          #(750.0, 250.0),
-          #(750.0, 650.0),
-          #(550.0, 650.0),
+          #(-100.0, -200.0),
+          #(100.0, -200.0),
+          #(100.0, 200.0),
+          #(-100.0, 200.0),
         ],
-        animation: [
-          #(650.0, 450.0),
-          #(650.0, 450.0),
-          #(650.0, 450.0),
-          #(650.0, 450.0),
-        ],
+        animation: list.repeat(#(0.0, 0.0), 4),
         color: p.colour_hex("#1111ff"),
       ),
     ]),
@@ -321,7 +311,11 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
   case event {
     event.KeyboardPressed(event.KeySpace) -> Paper(..state, space: True)
     event.KeyboardRelased(event.KeySpace) -> Paper(..state, space: False)
-    event.MouseMoved(x, y) -> Paper(..state, mouse: #(x, y))
+    event.MouseMoved(x, y) ->
+      Paper(..state, mouse: #(
+        x -. canvas_width() /. 2.0,
+        y -. canvas_height() /. 2.0,
+      ))
     event.MousePressed(event.MouseButtonLeft) ->
       Paper(..state, line: Some(state.mouse))
     event.MouseReleased(event.MouseButtonLeft) ->
@@ -368,4 +362,11 @@ pub fn view(state: Paper) -> p.Picture {
     draw_layer(state.layers),
     line,
   ])
+  |> p.translate_xy(canvas_width() /. 2.0, canvas_height() /. 2.0)
 }
+
+@external(javascript, "./canvas_extra.mjs", "width")
+fn canvas_width() -> Float
+
+@external(javascript, "./canvas_extra.mjs", "height")
+fn canvas_height() -> Float

@@ -25,6 +25,15 @@
     </style>
     <canvas id="mycanvas" width="1920" height="1080"></canvas>
     <script type="module"">
+        function resize() {
+            const canvas = document.getElementById('mycanvas');
+            const dpr = window.devicePixelRatio;
+            const width = canvas.width = window.innerWidth * dpr;
+            const height = canvas.height = window.innerHeight * dpr;
+        }
+        window.onresize = resize;
+        resize();
+
         import { main } from "./build/dev/javascript/paper/paper.mjs";
         main();
     </script>
