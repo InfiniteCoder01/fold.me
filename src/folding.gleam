@@ -36,7 +36,8 @@ fn reflect(point: Vec2, line: #(Float, Float, Float)) -> Vec2 {
 }
 
 pub type Layer {
-  Layer(points: List(Vec2), animation: List(Vec2))
+  Layer(points: List(Vec2), animation: List(Vec2), color: p.Colour)
+  Stack(List(Layer))
   Fold(top: Layer, bottom: Layer, fold: #(Vec2, Vec2))
 }
 
@@ -45,6 +46,33 @@ fn split(
   fold_line: #(Float, Float, Float),
   allow_partial: Bool,
 ) -> #(Option(Layer), Option(Layer), Option(#(Vec2, Vec2))) {
+  // Combines line segments along the fold_line
+  let combine_lines = fn(fold1: Option(#(_, _)), fold2: Option(#(_, _))) {
+    case fold1, fold2 {
+      Some(fold1), Some(fold2) -> {
+        let eval = fn(p: #(_, _)) {
+          fold_line.1 *. p.0 -. fold_line.0 *. p.1 +. fold_line.2
+        }
+
+        Some(
+          #(
+            case eval(fold1.0) <. eval(fold2.0) {
+              True -> fold1.0
+              False -> fold2.0
+            },
+            case eval(fold1.1) >. eval(fold2.1) {
+              True -> fold1.1
+              False -> fold2.1
+            },
+          ),
+        )
+      }
+      Some(fold), None -> Some(fold)
+      None, Some(fold) -> Some(fold)
+      None, None -> None
+    }
+  }
+
   case layer {
     Layer(points:, ..) -> {
       // Split the points into groups depending on above/below the line
@@ -81,19 +109,48 @@ fn split(
           let p1 = line_intersection(points2line(a1, b2), fold_line)
           let p2 = line_intersection(points2line(a2, b1), fold_line)
           #(
-            Some(Layer(
-              points: list.flatten([[p1], a, [p2]]),
-              animation: list.flatten([[p1], a, [p2]]),
-            )),
-            Some(Layer(
-              points: list.flatten([[p2], b, [p1]]),
-              animation: list.flatten([[p2], b, [p1]]),
-            )),
+            Some(
+              Layer(
+                ..layer,
+                points: list.flatten([[p1], a, [p2]]),
+                animation: list.flatten([[p1], a, [p2]]),
+              ),
+            ),
+            Some(
+              Layer(
+                ..layer,
+                points: list.flatten([[p2], b, [p1]]),
+                animation: list.flatten([[p2], b, [p1]]),
+              ),
+            ),
             Some(#(p1, p2)),
           )
         }
         _ -> panic
       }
+    }
+
+    Stack(layers) -> {
+      let #(top, bottom, fold) =
+        list.fold(layers, #([], [], None), fn(state, layer) {
+          let #(ltop, lbottom, fold) = state
+          let #(top, bottom, fold1) = split(layer, fold_line, allow_partial)
+          let ltop = list.append(option.values([top]), ltop)
+          let lbottom = list.append(option.values([bottom]), lbottom)
+          #(ltop, lbottom, combine_lines(fold, fold1))
+        })
+
+      #(
+        case top {
+          [] -> None
+          layers -> Some(Stack(list.reverse(layers)))
+        },
+        case bottom {
+          [] -> None
+          layers -> Some(Stack(list.reverse(layers)))
+        },
+        fold,
+      )
     }
 
     Fold(top:, bottom:, fold: current_fold) -> {
@@ -124,28 +181,7 @@ fn split(
             list.append(ltop, option.values([top])),
             list.append(lbottom, option.values([bottom])),
             // Find the biggest fold line segment
-            case new_fold, new_fold2 {
-              Some(fold1), Some(fold2) -> {
-                let eval = fn(p: #(_, _)) {
-                  fold_line.1 *. p.0 -. fold_line.0 *. p.1 +. fold_line.2
-                }
-                Some(
-                  #(
-                    case eval(fold1.0) <. eval(fold2.0) {
-                      True -> fold1.0
-                      False -> fold2.0
-                    },
-                    case eval(fold1.1) >. eval(fold2.1) {
-                      True -> fold1.1
-                      False -> fold2.1
-                    },
-                  ),
-                )
-              }
-              None, Some(fold) -> Some(fold)
-              Some(fold), None -> Some(fold)
-              None, None -> None
-            },
+            combine_lines(new_fold, new_fold2),
           )
         }
       }
@@ -192,6 +228,7 @@ pub fn flip(layer: Layer, flip_line: #(Float, Float, Float)) -> Layer {
   case layer {
     Layer(points:, ..) ->
       Layer(..layer, points: list.map(points, reflect(_, flip_line)))
+    Stack(layers) -> Stack(list.reverse(list.map(layers, flip(_, flip_line))))
     Fold(top:, bottom:, fold: #(p1, p2)) ->
       Fold(flip(bottom, flip_line), flip(top, flip_line), #(
         reflect(p1, flip_line),
@@ -220,90 +257,48 @@ pub fn init() -> Paper {
     space: False,
     mouse: #(0.0, 0.0),
     line: None,
-    layers: Layer(
-      points: [
-        #(500.0, 200.0),
-        #(800.0, 200.0),
-        #(800.0, 700.0),
-        #(500.0, 700.0),
-      ],
-      animation: [
-        #(650.0, 450.0),
-        #(650.0, 450.0),
-        #(650.0, 450.0),
-        #(650.0, 450.0),
-      ],
-    ),
+    layers: Stack([
+      Layer(
+        points: [
+          #(500.0, 200.0),
+          #(800.0, 200.0),
+          #(800.0, 700.0),
+          #(500.0, 700.0),
+        ],
+        animation: [
+          #(650.0, 450.0),
+          #(650.0, 450.0),
+          #(650.0, 450.0),
+          #(650.0, 450.0),
+        ],
+        color: p.colour_hex("#F1E9D2"),
+      ),
+      Layer(
+        points: [
+          #(550.0, 250.0),
+          #(750.0, 250.0),
+          #(750.0, 650.0),
+          #(550.0, 650.0),
+        ],
+        animation: [
+          #(650.0, 450.0),
+          #(650.0, 450.0),
+          #(650.0, 450.0),
+          #(650.0, 450.0),
+        ],
+        color: p.colour_hex("#1111ff"),
+      ),
+    ]),
   )
 }
 
-// fn fold(
-//   layers: List(Layer),
-//   fold_line: #(Float, Float, Float),
-//   space: Bool,
-// ) -> List(Layer) {
-//   let intuitive_order = fn(top, bottom) {
-//     let direction =
-//       list.fold(top, 0.0, fn(area, layer) { area +. layer_area(layer) })
-//       <. list.fold(bottom, 0.0, fn(area, layer) { area +. layer_area(layer) })
-
-//     case direction {
-//       True -> #(top, bottom)
-//       False -> #(bottom, top)
-//     }
-//   }
-
-//   let #(top, bottom, keep_going) =
-//     list.fold(layers, #([], [], True), fn(state, layer) {
-//       let #(ltop, lbottom, keep_going) = state
-//       case keep_going {
-//         True ->
-//           case fold(layer, fold_line) {
-//             #(_, True) if space -> #(ltop, [layer, ..lbottom], False)
-//             #([top, bottom], False) if space -> {
-//               let #(ltop, lbottom) =
-//                 intuitive_order([top, ..ltop], [bottom, ..lbottom])
-//               #(ltop, lbottom, False)
-//             }
-//             #(layers, _) -> {
-//               let #(ltop, lbottom) =
-//                 list.fold(layers, #(ltop, lbottom), fn(state, layer) {
-//                   let #(ltop, lbottom) = state
-//                   let above = case layer.points {
-//                     [_, point, ..] -> above_line(point, fold_line)
-//                     _ -> False
-//                   }
-//                   case above {
-//                     True -> #([layer, ..ltop], lbottom)
-//                     False -> #(ltop, [layer, ..lbottom])
-//                   }
-//                 })
-//               #(ltop, lbottom, True)
-//             }
-//           }
-//         False -> #(ltop, [layer, ..lbottom], False)
-//       }
-//     })
-
-//   let #(top, bottom) = case keep_going {
-//     True -> intuitive_order(top, bottom)
-//     False -> #(top, bottom)
-//   }
-
-//   list.append(
-//     list.map(top, fn(layer) {
-//       Layer(..layer, points: list.map(layer.points, reflect(_, fold_line)))
-//     }),
-//     list.reverse(bottom),
-//   )
-// }
-
 fn update_animation(layer: Layer) -> Layer {
   case layer {
-    Layer(points:, animation:) ->
+    Layer(points:, animation:, ..) ->
       Layer(
-        points,
-        list.map(list.zip(points, animation), fn(e) {
+        ..layer,
+        points: points,
+        animation: list.map(list.zip(points, animation), fn(e) {
           let #(target, p) = e
           // p + (target - p) * 0.1
           #(
@@ -312,6 +307,7 @@ fn update_animation(layer: Layer) -> Layer {
           )
         }),
       )
+    Stack(layers) -> Stack(list.map(layers, update_animation))
     Fold(top:, bottom:, ..) ->
       Fold(
         ..layer,
@@ -343,7 +339,7 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
 
 fn draw_layer(layer: Layer) -> p.Picture {
   case layer {
-    Layer(animation: [p1, p2, ..rest], ..) ->
+    Layer(animation: [p1, p2, ..rest], color:, ..) ->
       p.path(
         p1,
         list.flatten([
@@ -353,7 +349,8 @@ fn draw_layer(layer: Layer) -> p.Picture {
         ]),
       )
       |> p.stroke(colour.black, 3.0)
-      |> p.fill(p.colour_hex("#F1E9D2"))
+      |> p.fill(color)
+    Stack(layers) -> p.combine(list.map(layers, draw_layer))
     Fold(top:, bottom:, ..) -> p.concat(draw_layer(bottom), draw_layer(top))
     _ -> p.blank()
   }
