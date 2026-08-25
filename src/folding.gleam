@@ -1,9 +1,12 @@
+import gleam/float
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam_community/colour
+import layer.{type Layer} as l
 import paint.{type Vec2} as p
 import paint/event
+import prng/random
 
 fn points2line(a: Vec2, b: Vec2) -> #(Float, Float, Float) {
   #(b.1 -. a.1, a.0 -. b.0, b.0 *. a.1 -. a.0 *. b.1)
@@ -26,19 +29,6 @@ fn above_line(point: Vec2, line: #(Float, Float, Float)) -> Bool {
   let #(x, y) = point
 
   a *. x +. b *. y +. c >=. 0.0
-}
-
-fn reflect(point: Vec2, line: #(Float, Float, Float)) -> Vec2 {
-  let #(a, b, c) = line
-  let #(x, y) = point
-  let k = 2.0 *. { a *. x +. b *. y +. c } /. { a *. a +. b *. b }
-  #(x -. a *. k, y -. b *. k)
-}
-
-pub type Layer {
-  Layer(points: List(Vec2), animation: List(Vec2), color: p.Colour)
-  Stack(List(Layer))
-  Fold(top: Layer, bottom: Layer, crease: #(Vec2, Vec2))
 }
 
 fn split(
@@ -93,7 +83,7 @@ fn split(
   }
 
   case layer {
-    Layer(points:, ..) -> {
+    l.Layer(points:, ..) -> {
       // Split the points into groups depending on above/below the line
       let polys = list.chunk(points, above_line(_, fold_line))
       let polys = case polys {
@@ -129,14 +119,14 @@ fn split(
           let p2 = line_intersection(points2line(a2, b1), fold_line)
           #(
             Some(
-              Layer(
+              l.Layer(
                 ..layer,
                 points: list.flatten([[p1], a, [p2]]),
                 animation: list.flatten([[p1], a, [p2]]),
               ),
             ),
             Some(
-              Layer(
+              l.Layer(
                 ..layer,
                 points: list.flatten([[p2], b, [p1]]),
                 animation: list.flatten([[p2], b, [p1]]),
@@ -149,7 +139,7 @@ fn split(
       }
     }
 
-    Stack(layers) -> {
+    l.Stack(layers) -> {
       let #(top, bottom, fold) =
         list.fold_right(layers, #([], [], None), fn(state, layer) {
           let #(ltop, lbottom, fold) = state
@@ -162,17 +152,17 @@ fn split(
       #(
         case top {
           [] -> None
-          layers -> Some(Stack(layers))
+          layers -> Some(l.Stack(layers))
         },
         case bottom {
           [] -> None
-          layers -> Some(Stack(layers))
+          layers -> Some(l.Stack(layers))
         },
         fold,
       )
     }
 
-    Fold(top:, bottom:, crease:) -> {
+    l.Fold(top:, bottom:, crease:) -> {
       // Split both layers into top and bottom sections,
       // get the new crease line
       let #(top, bottom, new_crease) = {
@@ -205,26 +195,13 @@ fn split(
         case layers {
           [] -> None
           [layer] -> Some(layer)
-          [top, bottom] -> Some(Fold(top, bottom, crease))
+          [top, bottom] -> Some(l.Fold(top, bottom, crease))
           _ -> panic
         }
       }
 
       #(combine(top, crease1), combine(bottom, crease2), new_crease)
     }
-  }
-}
-
-pub fn flip(layer: Layer, flip_line: #(Float, Float, Float)) -> Layer {
-  case layer {
-    Layer(points:, ..) ->
-      Layer(..layer, points: list.map(points, reflect(_, flip_line)))
-    Stack(layers) -> Stack(list.reverse(list.map(layers, flip(_, flip_line))))
-    Fold(top:, bottom:, crease: #(p1, p2)) ->
-      Fold(flip(bottom, flip_line), flip(top, flip_line), #(
-        reflect(p1, flip_line),
-        reflect(p2, flip_line),
-      ))
   }
 }
 
@@ -237,18 +214,18 @@ pub fn fold(
     let #(top, bottom, crease) = split(layer, fold_line)
     case top, bottom, crease {
       Some(top), Some(bottom), Some(crease) -> #(
-        callback(Fold(flip(top, fold_line), bottom, crease)),
+        callback(l.Fold(l.flip(top, fold_line), bottom, crease)),
         True,
       )
       // Not calling callback here, but I DON'T KNOW WHAT TO DO ABOUT THAT
-      Some(top), None, _ -> #(flip(top, fold_line), True)
+      Some(top), None, _ -> #(l.flip(top, fold_line), True)
       None, Some(bottom), _ -> #(bottom, False)
       _, _, _ -> #(layer, False)
     }
   }
 
   case layer {
-    Fold(top:, bottom:, crease:) -> {
+    l.Fold(top:, bottom:, crease:) -> {
       // Check how fold_line intersects with this fold's crease line
       let fold_all =
         above_line(crease.0, fold_line) || above_line(crease.1, fold_line)
@@ -257,13 +234,17 @@ pub fn fold(
         True -> split_fold(layer)
         False -> {
           case fold(top, fold_line, callback) {
-            #(top, True) -> #(Fold(top, bottom, crease), True)
+            #(top, True) -> #(l.Fold(top, bottom, crease), True)
             #(top, False) ->
               case
                 fold(bottom, fold_line, fn(layer) {
                   case layer {
-                    Fold(top: top1, bottom: bottom1, crease: crease1) -> {
-                      callback(Fold(top1, Fold(top, bottom1, crease), crease1))
+                    l.Fold(top: top1, bottom: bottom1, crease: crease1) -> {
+                      callback(l.Fold(
+                        top1,
+                        l.Fold(top, bottom1, crease),
+                        crease1,
+                      ))
                     }
                     layer -> layer
                   }
@@ -280,8 +261,82 @@ pub fn fold(
   }
 }
 
-// --------------------------------
-pub opaque type Paper {
+fn bottommost(layer: Layer) -> List(Vec2) {
+  case layer {
+    l.Layer(points:, ..) -> points
+    l.Stack([layer, ..]) -> bottommost(layer)
+    l.Fold(_, layer, _) -> bottommost(layer)
+    _ -> []
+  }
+}
+
+@external(javascript, "./extras.mjs", "time")
+fn time() -> Int
+
+pub fn randomize(layer: Layer, count: Int) -> Layer {
+  case count {
+    0 -> layer
+    count -> {
+      let layer = randomize(layer, count - 1)
+      let points = bottommost(layer)
+      let points =
+        list.fold(
+          points,
+          #([], result.lazy_unwrap(list.last(points), fn() { panic })),
+          fn(state, point) {
+            let #(points, last) = state
+            #(
+              [
+                point,
+                #({ point.0 +. last.0 } /. 2.0, { point.1 +. last.1 } /. 2.0),
+                ..points
+              ],
+              point,
+            )
+          },
+        ).0
+
+      case points {
+        [first, ..rest] -> {
+          let seed = random.new_seed(count + time())
+          let #(point, seed) = random.step(random.uniform(first, rest), seed)
+          let #(dx, seed) = random.step(random.uniform(0.0, [-1.0, 1.0]), seed)
+          let #(dy, _) = random.step(random.uniform(0.0, [-1.0, 1.0]), seed)
+          let th =
+            float.max(
+              float.absolute_value(point.0),
+              float.absolute_value(point.1),
+            )
+            /. 3.0
+
+          let cmp = fn(x, fb) {
+            case x <. 0.0 -. th, x >. th {
+              True, False -> -1.0
+              False, False -> fb
+              False, True -> 1.0
+              _, _ -> panic
+            }
+          }
+
+          let line =
+            points2line(point, #(
+              point.0 -. cmp(point.0, dx),
+              point.1 -. cmp(point.1, dy),
+            ))
+
+          case line {
+            #(0.0, 0.0, 0.0) -> layer
+            line -> l.center(fold(layer, line, fn(layer) { layer }).0)
+          }
+        }
+        [] -> layer
+      }
+    }
+  }
+}
+
+// -------------------------------- Interactive
+pub type Paper {
   Paper(space: Bool, mouse: Vec2, line: Option(Vec2), layers: Layer)
 }
 
@@ -290,54 +345,8 @@ pub fn init() -> Paper {
     space: False,
     mouse: #(0.0, 0.0),
     line: None,
-    layers: Stack([
-      Layer(
-        points: [
-          #(-150.0, -250.0),
-          #(150.0, -250.0),
-          #(150.0, 250.0),
-          #(-150.0, 250.0),
-        ],
-        animation: list.repeat(#(0.0, 0.0), 4),
-        color: p.colour_hex("#F1E9D2"),
-      ),
-      Layer(
-        points: [
-          #(-100.0, -200.0),
-          #(100.0, -200.0),
-          #(100.0, 200.0),
-          #(-100.0, 200.0),
-        ],
-        animation: list.repeat(#(0.0, 0.0), 4),
-        color: p.colour_hex("#1111ff"),
-      ),
-    ]),
+    layers: l.default_stack(1.0),
   )
-}
-
-fn update_animation(layer: Layer) -> Layer {
-  case layer {
-    Layer(points:, animation:, ..) ->
-      Layer(
-        ..layer,
-        points: points,
-        animation: list.map(list.zip(points, animation), fn(e) {
-          let #(target, p) = e
-          // p + (target - p) * 0.1
-          #(
-            p.0 +. { target.0 -. p.0 } *. 0.1,
-            p.1 +. { target.1 -. p.1 } *. 0.1,
-          )
-        }),
-      )
-    Stack(layers) -> Stack(list.map(layers, update_animation))
-    Fold(top:, bottom:, ..) ->
-      Fold(
-        ..layer,
-        top: update_animation(top),
-        bottom: update_animation(bottom),
-      )
-  }
 }
 
 pub fn update(state: Paper, event: event.Event) -> Paper {
@@ -363,27 +372,8 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
         }
         state -> state
       }
-    event.Tick(_) -> Paper(..state, layers: update_animation(state.layers))
+    event.Tick(_) -> Paper(..state, layers: l.update_animation(state.layers))
     _ -> state
-  }
-}
-
-fn draw_layer(layer: Layer) -> p.Picture {
-  case layer {
-    Layer(animation: [p1, p2, ..rest], color:, ..) ->
-      p.path(
-        p1,
-        list.flatten([
-          [p.path_line(p2)],
-          list.map(rest, p.path_line),
-          [p.path_line(p1), p.path_line(p2)],
-        ]),
-      )
-      |> p.stroke(colour.black, 3.0)
-      |> p.fill(color)
-    Stack(layers) -> p.combine(list.map(layers, draw_layer))
-    Fold(top:, bottom:, ..) -> p.concat(draw_layer(bottom), draw_layer(top))
-    _ -> p.blank()
   }
 }
 
@@ -396,14 +386,14 @@ pub fn view(state: Paper) -> p.Picture {
   }
 
   p.combine([
-    draw_layer(state.layers),
+    l.draw_layer(state.layers),
     line,
   ])
   |> p.translate_xy(canvas_width() /. 2.0, canvas_height() /. 2.0)
 }
 
-@external(javascript, "./canvas_extra.mjs", "width")
-fn canvas_width() -> Float
+@external(javascript, "./extras.mjs", "width")
+pub fn canvas_width() -> Float
 
-@external(javascript, "./canvas_extra.mjs", "height")
-fn canvas_height() -> Float
+@external(javascript, "./extras.mjs", "height")
+pub fn canvas_height() -> Float
