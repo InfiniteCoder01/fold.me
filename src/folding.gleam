@@ -38,37 +38,56 @@ fn reflect(point: Vec2, line: #(Float, Float, Float)) -> Vec2 {
 pub type Layer {
   Layer(points: List(Vec2), animation: List(Vec2), color: p.Colour)
   Stack(List(Layer))
-  Fold(top: Layer, bottom: Layer, fold: #(Vec2, Vec2))
+  Fold(top: Layer, bottom: Layer, crease: #(Vec2, Vec2))
 }
 
 fn split(
   layer: Layer,
   fold_line: #(Float, Float, Float),
-  allow_partial: Bool,
 ) -> #(Option(Layer), Option(Layer), Option(#(Vec2, Vec2))) {
   // Combines line segments along the fold_line
-  let combine_lines = fn(fold1: Option(#(_, _)), fold2: Option(#(_, _))) {
-    case fold1, fold2 {
-      Some(fold1), Some(fold2) -> {
-        let eval = fn(p: #(_, _)) {
-          fold_line.1 *. p.0 -. fold_line.0 *. p.1 +. fold_line.2
-        }
+  let combine_lines = fn(crease1: Option(#(_, _)), crease2: Option(#(_, _))) {
+    let eval = fn(p: #(_, _)) {
+      fold_line.1 *. p.0 -. fold_line.0 *. p.1 +. fold_line.2
+    }
 
+    let crease1 = case crease1 {
+      Some(#(p1, p2)) -> {
+        case eval(p1) <. eval(p2) {
+          True -> Some(#(p1, p2))
+          False -> Some(#(p2, p1))
+        }
+      }
+      None -> None
+    }
+
+    let crease2 = case crease2 {
+      Some(#(p1, p2)) -> {
+        case eval(p1) <. eval(p2) {
+          True -> Some(#(p1, p2))
+          False -> Some(#(p2, p1))
+        }
+      }
+      None -> None
+    }
+
+    case crease1, crease2 {
+      Some(crease1), Some(crease2) -> {
         Some(
           #(
-            case eval(fold1.0) <. eval(fold2.0) {
-              True -> fold1.0
-              False -> fold2.0
+            case eval(crease1.0) <. eval(crease2.0) {
+              True -> crease1.0
+              False -> crease2.0
             },
-            case eval(fold1.1) >. eval(fold2.1) {
-              True -> fold1.1
-              False -> fold2.1
+            case eval(crease1.1) >. eval(crease2.1) {
+              True -> crease1.1
+              False -> crease2.1
             },
           ),
         )
       }
-      Some(fold), None -> Some(fold)
-      None, Some(fold) -> Some(fold)
+      Some(crease), None -> Some(crease)
+      None, Some(crease) -> Some(crease)
       None, None -> None
     }
   }
@@ -132,9 +151,9 @@ fn split(
 
     Stack(layers) -> {
       let #(top, bottom, fold) =
-        list.fold(layers, #([], [], None), fn(state, layer) {
+        list.fold_right(layers, #([], [], None), fn(state, layer) {
           let #(ltop, lbottom, fold) = state
-          let #(top, bottom, fold1) = split(layer, fold_line, allow_partial)
+          let #(top, bottom, fold1) = split(layer, fold_line)
           let ltop = list.append(option.values([top]), ltop)
           let lbottom = list.append(option.values([bottom]), lbottom)
           #(ltop, lbottom, combine_lines(fold, fold1))
@@ -143,83 +162,55 @@ fn split(
       #(
         case top {
           [] -> None
-          layers -> Some(Stack(list.reverse(layers)))
+          layers -> Some(Stack(layers))
         },
         case bottom {
           [] -> None
-          layers -> Some(Stack(list.reverse(layers)))
+          layers -> Some(Stack(layers))
         },
         fold,
       )
     }
 
-    Fold(top:, bottom:, fold: current_fold) -> {
-      let current_fold = case above_line(current_fold.0, fold_line) {
-        True -> current_fold
-        False -> #(current_fold.1, current_fold.0)
+    Fold(top:, bottom:, crease:) -> {
+      // Split both layers into top and bottom sections,
+      // get the new crease line
+      let #(top, bottom, new_crease) = {
+        let #(top1, bottom1, crease1) = split(top, fold_line)
+        let #(top2, bottom2, crease2) = split(bottom, fold_line)
+        #(
+          option.values([top1, top2]),
+          option.values([bottom1, bottom2]),
+          combine_lines(crease1, crease2),
+        )
       }
 
-      // Split both layers into top and bottom sections
-      let #(ltop, lbottom, new_fold) = {
-        let #(top, bottom, new_fold) = split(top, fold_line, allow_partial)
-        #(option.values([top]), option.values([bottom]), new_fold)
-      }
+      let intersection =
+        line_intersection(points2line(crease.0, crease.1), fold_line)
 
-      // Weather we only need to fold the top part of this fold
-      // (the fold line of this fold is below fold_line)
-      let partial_fold =
-        !above_line(current_fold.0, fold_line)
-        && !list.is_empty(ltop)
-        && allow_partial
-
-      let #(ltop, lbottom, new_fold) = case partial_fold {
-        True -> #(ltop, list.append(lbottom, [bottom]), new_fold)
-        False -> {
-          let #(top, bottom, new_fold2) =
-            split(bottom, fold_line, list.is_empty(ltop) && allow_partial)
-          #(
-            list.append(ltop, option.values([top])),
-            list.append(lbottom, option.values([bottom])),
-            // Find the biggest fold line segment
-            combine_lines(new_fold, new_fold2),
-          )
-        }
-      }
-
-      // Compute fold line segments for new split layers
-      let #(fold_top, fold_bottom) = case
-        above_line(current_fold.0, fold_line),
-        above_line(current_fold.1, fold_line)
+      // Check how fold_line intersects with this fold's crease line
+      // and compute crease line segments for new split layers
+      let #(crease1, crease2) = case
+        above_line(crease.0, fold_line),
+        above_line(crease.1, fold_line)
       {
-        True, True -> #(current_fold, option.unwrap(new_fold, current_fold))
-        True, False -> {
-          // Intersection between fold_line and this fold
-          let intersection =
-            line_intersection(
-              points2line(current_fold.0, current_fold.1),
-              fold_line,
-            )
-          #(#(current_fold.0, intersection), #(intersection, current_fold.1))
-        }
-        False, True -> panic as "sorted"
-        False, False -> #(option.unwrap(new_fold, current_fold), current_fold)
+        True, True -> #(crease, option.unwrap(new_crease, crease))
+        True, False -> #(#(crease.0, intersection), #(intersection, crease.1))
+        False, True -> #(#(crease.1, intersection), #(intersection, crease.0))
+        False, False -> #(option.unwrap(new_crease, crease), crease)
       }
 
-      #(
-        case ltop {
+      // Combine the layers
+      let combine = fn(layers, crease) {
+        case layers {
           [] -> None
           [layer] -> Some(layer)
-          [top, bottom] -> Some(Fold(top, bottom, fold_top))
+          [top, bottom] -> Some(Fold(top, bottom, crease))
           _ -> panic
-        },
-        case lbottom {
-          [] -> None
-          [layer] -> Some(layer)
-          [top, bottom] -> Some(Fold(top, bottom, fold_bottom))
-          _ -> panic
-        },
-        new_fold,
-      )
+        }
+      }
+
+      #(combine(top, crease1), combine(bottom, crease2), new_crease)
     }
   }
 }
@@ -229,7 +220,7 @@ pub fn flip(layer: Layer, flip_line: #(Float, Float, Float)) -> Layer {
     Layer(points:, ..) ->
       Layer(..layer, points: list.map(points, reflect(_, flip_line)))
     Stack(layers) -> Stack(list.reverse(list.map(layers, flip(_, flip_line))))
-    Fold(top:, bottom:, fold: #(p1, p2)) ->
+    Fold(top:, bottom:, crease: #(p1, p2)) ->
       Fold(flip(bottom, flip_line), flip(top, flip_line), #(
         reflect(p1, flip_line),
         reflect(p2, flip_line),
@@ -237,13 +228,55 @@ pub fn flip(layer: Layer, flip_line: #(Float, Float, Float)) -> Layer {
   }
 }
 
-pub fn fold(layer: Layer, fold_line: #(Float, Float, Float)) -> Layer {
-  case split(layer, fold_line, True) {
-    #(Some(top), Some(bottom), Some(flip1)) ->
-      Fold(flip(top, fold_line), bottom, flip1)
-    #(Some(top), None, _) -> flip(top, fold_line)
-    #(None, Some(bottom), _) -> bottom
-    _ -> panic
+pub fn fold(
+  layer: Layer,
+  fold_line: #(Float, Float, Float),
+  callback: fn(Layer) -> Layer,
+) -> #(Layer, Bool) {
+  let split_fold = fn(layer) {
+    let #(top, bottom, crease) = split(layer, fold_line)
+    case top, bottom, crease {
+      Some(top), Some(bottom), Some(crease) -> #(
+        callback(Fold(flip(top, fold_line), bottom, crease)),
+        True,
+      )
+      // Not calling callback here, but I DON'T KNOW WHAT TO DO ABOUT THAT
+      Some(top), None, _ -> #(flip(top, fold_line), True)
+      None, Some(bottom), _ -> #(bottom, False)
+      _, _, _ -> #(layer, False)
+    }
+  }
+
+  case layer {
+    Fold(top:, bottom:, crease:) -> {
+      // Check how fold_line intersects with this fold's crease line
+      let fold_all =
+        above_line(crease.0, fold_line) || above_line(crease.1, fold_line)
+
+      case fold_all {
+        True -> split_fold(layer)
+        False -> {
+          case fold(top, fold_line, callback) {
+            #(top, True) -> #(Fold(top, bottom, crease), True)
+            #(top, False) ->
+              case
+                fold(bottom, fold_line, fn(layer) {
+                  case layer {
+                    Fold(top: top1, bottom: bottom1, crease: crease1) -> {
+                      callback(Fold(top1, Fold(top, bottom1, crease), crease1))
+                    }
+                    layer -> layer
+                  }
+                })
+              {
+                #(_, True) as result -> result
+                _ -> #(layer, False)
+              }
+          }
+        }
+      }
+    }
+    layer -> split_fold(layer)
   }
 }
 
@@ -322,7 +355,11 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
       case state {
         Paper(space: _, mouse:, line: Some(start), layers:) -> {
           let fold_line = points2line(start, mouse)
-          Paper(..state, line: None, layers: fold(layers, fold_line))
+          Paper(
+            ..state,
+            line: None,
+            layers: fold(layers, fold_line, fn(layer) { layer }).0,
+          )
         }
         state -> state
       }
