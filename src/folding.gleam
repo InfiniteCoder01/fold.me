@@ -261,15 +261,6 @@ pub fn fold(
   }
 }
 
-fn bottommost(layer: Layer) -> List(Vec2) {
-  case layer {
-    l.Layer(points:, ..) -> points
-    l.Stack([layer, ..]) -> bottommost(layer)
-    l.Fold(_, layer, _) -> bottommost(layer)
-    _ -> []
-  }
-}
-
 @external(javascript, "./extras.mjs", "time")
 fn time() -> Int
 
@@ -278,7 +269,7 @@ pub fn randomize(layer: Layer, count: Int) -> Layer {
     0 -> layer
     count -> {
       let layer = randomize(layer, count - 1)
-      let points = bottommost(layer)
+      let points = l.bottommost(layer)
       let points =
         list.fold(
           points,
@@ -337,22 +328,21 @@ pub fn randomize(layer: Layer, count: Int) -> Layer {
 
 // -------------------------------- Interactive
 pub type Paper {
-  Paper(space: Bool, mouse: Vec2, line: Option(Vec2), layers: Layer)
+  Paper(mouse: Vec2, line: Option(Vec2), layers: Layer)
 }
 
 pub fn init() -> Paper {
-  Paper(
-    space: False,
-    mouse: #(0.0, 0.0),
-    line: None,
-    layers: l.default_stack(1.0),
-  )
+  Paper(mouse: #(0.0, 0.0), line: None, layers: l.default_stack(1.0))
 }
 
-pub fn update(state: Paper, event: event.Event) -> Paper {
+pub fn update(
+  state: Paper,
+  event: event.Event,
+  on_fold: fn(Layer) -> Layer,
+) -> Paper {
   case event {
-    event.KeyboardPressed(event.KeySpace) -> Paper(..state, space: True)
-    event.KeyboardRelased(event.KeySpace) -> Paper(..state, space: False)
+    event.KeyboardPressed(event.KeySpace) ->
+      Paper(..state, layers: l.align(l.center(state.layers), 0.25))
     event.MouseMoved(x, y) ->
       Paper(..state, mouse: #(
         x -. canvas_width() /. 2.0,
@@ -362,12 +352,12 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
       Paper(..state, line: Some(state.mouse))
     event.MouseReleased(event.MouseButtonLeft) ->
       case state {
-        Paper(space: _, mouse:, line: Some(start), layers:) -> {
+        Paper(mouse:, line: Some(start), layers:) -> {
           let fold_line = points2line(start, mouse)
           Paper(
             ..state,
             line: None,
-            layers: fold(layers, fold_line, fn(layer) { layer }).0,
+            layers: on_fold(fold(layers, fold_line, fn(layer) { layer }).0),
           )
         }
         state -> state

@@ -1,6 +1,10 @@
+import gleam/float
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam_community/colour
+import gleam_community/maths
 import paint.{type Vec2} as p
 
 pub type Layer {
@@ -92,6 +96,37 @@ pub fn center(layer: Layer) -> Layer {
   transform(layer, fn(p) { #(p.0 -. center.0, p.1 -. center.1) })
 }
 
+pub fn bottommost(layer: Layer) -> List(Vec2) {
+  case layer {
+    Layer(points:, ..) -> points
+    Stack([layer, ..]) -> bottommost(layer)
+    Fold(_, layer, _) -> bottommost(layer)
+    _ -> []
+  }
+}
+
+pub fn align(layer: Layer, percentage: Float) -> Layer {
+  case bottommost(layer) {
+    [p1, p2, ..] -> {
+      let angle = maths.atan2(p2.1 -. p1.1, p2.0 -. p1.0)
+      let angle_mod = 6.2831852 *. percentage
+      let angle = result.unwrap(float.modulo(angle, angle_mod), angle)
+      let angle = case angle_mod -. angle <. angle {
+        True -> angle -. angle_mod
+        False -> angle
+      }
+
+      let sin = maths.sin(0.0 -. angle)
+      let cos = maths.cos(0.0 -. angle)
+
+      transform(layer, fn(p) {
+        #(p.0 *. cos -. p.1 *. sin, p.0 *. sin +. p.1 *. cos)
+      })
+    }
+    _ -> layer
+  }
+}
+
 // -------------------------------------- Interactive
 pub fn update_animation(layer: Layer) -> Layer {
   case layer {
@@ -134,5 +169,61 @@ pub fn draw_layer(layer: Layer) -> p.Picture {
     Stack(layers) -> p.combine(list.map(layers, draw_layer))
     Fold(top:, bottom:, ..) -> p.concat(draw_layer(bottom), draw_layer(top))
     _ -> p.blank()
+  }
+}
+
+pub fn match(a: Layer, b: Layer, scale: Float) -> Option(Float) {
+  let combine = fn(scores) {
+    option.map(option.all(scores), fn(scores) {
+      let count = int.to_float(list.length(scores))
+      list.fold(scores, 0.0, fn(a, b) { a +. b }) /. count
+    })
+  }
+  case a, b {
+    Layer(points: points1, color: color1, ..),
+      Layer(points: points2, color: color2, ..)
+      if color1 == color2
+    -> {
+      let points2 = list.map(points2, fn(p) { #(p.0 /. scale, p.1 /. scale) })
+      let closest = fn(p: #(_, _), set) {
+        result.unwrap(
+          float.square_root(
+            list.fold(set, 1_000_000.0, fn(dst, p2: #(_, _)) {
+              let #(dx, dy) = #(p2.0 -. p.0, p2.1 -. p.1)
+              float.min(dst, dx *. dx +. dy *. dy)
+            }),
+          ),
+          0.0,
+        )
+      }
+
+      let distances =
+        list.append(
+          list.map(points1, closest(_, points2)),
+          list.map(points2, closest(_, points1)),
+        )
+      let count = int.to_float(list.length(distances))
+      let score =
+        list.fold(distances, 0.0, fn(score, dst) {
+          score +. 1.0 -. dst *. dst /. 10_000.0
+        })
+        /. count
+      case score >=. 0.2 {
+        True -> Some(score)
+        False -> None
+      }
+    }
+    Stack(layers1), Stack(layers2) ->
+      option.then(
+        option.from_result(list.strict_zip(layers1, layers2)),
+        fn(pairs) {
+          combine(
+            list.map(pairs, fn(pair: #(_, _)) { match(pair.0, pair.1, scale) }),
+          )
+        },
+      )
+    Fold(top: top1, bottom: bottom1, ..), Fold(top: top2, bottom: bottom2, ..)
+    -> combine([match(top1, top2, scale), match(bottom1, bottom2, scale)])
+    _, _ -> None
   }
 }

@@ -8,15 +8,18 @@
 
 packages = [
   { name = "gleam_community_colour", version = "2.0.4", build_tools = ["gleam"], requirements = ["gleam_json", "gleam_stdlib"], otp_app = "gleam_community_colour", source = "hex", outer_checksum = "6DB4665555D7D2B27F0EA32EF47E8BEBC4303821765F9C73D483F38EE24894F0" },
+  { name = "gleam_community_maths", version = "2.0.2", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_yielder"], otp_app = "gleam_community_maths", source = "hex", outer_checksum = "8B0DA56738D4387666A9FA63554B159E2EDF269CAD4B847AB055364E288A71EC" },
   { name = "gleam_javascript", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_javascript", source = "hex", outer_checksum = "D542C4B4F40E942F5D3372D524419FA521A7BB92D621AF696CC286E89D882D55" },
   { name = "gleam_json", version = "3.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_json", source = "hex", outer_checksum = "44FDAA8847BE8FC48CA7A1C089706BD54BADCC4C45B237A992EDDF9F2CDB2836" },
   { name = "gleam_stdlib", version = "1.0.5", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "CEE5B6C076A85B45F60C585F4316C63EC8B7127C119D5738C3958A9C4D50404E" },
+  { name = "gleam_yielder", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_yielder", source = "hex", outer_checksum = "8E4E4ECFA7982859F430C57F549200C7749823C106759F4A19A78AEA6687717A" },
   { name = "paint", version = "2.0.0", build_tools = ["gleam"], requirements = ["gleam_community_colour", "gleam_javascript", "gleam_json", "gleam_stdlib"], otp_app = "paint", source = "hex", outer_checksum = "5A66309120D9A9F9C4DF85647F5C28FD9D19327AF6A1E1AC0D4C2DD753824FAE" },
   { name = "prng", version = "5.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "prng", source = "hex", outer_checksum = "29DA88BCFB54D06DD1472951DF101E9524878056D139DA2616B04350B403CE10" },
 ]
 
 [requirements]
 gleam_community_colour = { version = ">= 2.0.0 and < 3.0.0" }
+gleam_community_maths = { version = ">= 2.0.2 and < 3.0.0" }
 gleam_stdlib = { version = ">= 1.0.0 and < 2.0.0" }
 paint = { version = ">= 2.0.0 and < 3.0.0" }
 prng = { version = ">= 5.1.0 and < 6.0.0" }
