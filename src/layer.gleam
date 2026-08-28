@@ -105,11 +105,20 @@ pub fn bottommost(layer: Layer) -> List(Vec2) {
   }
 }
 
-pub fn align(layer: Layer, percentage: Float) -> Layer {
+pub fn topmost(layer: Layer) -> Layer {
+  case layer {
+    Layer(..) -> layer
+    Stack(layers) ->
+      topmost(result.lazy_unwrap(list.last(layers), fn() { panic }))
+    Fold(layer, _, _) -> topmost(layer)
+  }
+}
+
+pub fn align(layer: Layer, segments: Int) -> Layer {
   case bottommost(layer) {
     [p1, p2, ..] -> {
       let angle = maths.atan2(p2.1 -. p1.1, p2.0 -. p1.0)
-      let angle_mod = 6.2831852 *. percentage
+      let angle_mod = 6.2831852 /. int.to_float(segments)
       let angle = result.unwrap(float.modulo(angle, angle_mod), angle)
       let angle = case angle_mod -. angle <. angle {
         True -> angle -. angle_mod
@@ -124,6 +133,35 @@ pub fn align(layer: Layer, percentage: Float) -> Layer {
       })
     }
     _ -> layer
+  }
+}
+
+fn triangle_area(p1: Vec2, p2: Vec2, p3: Vec2) -> Float {
+  // (1/2){x1(y2 − y3) + x2(y3 − y1) + x3(y1 − y2)}
+  float.absolute_value(
+    {
+      p1.0
+      *. { p2.1 -. p3.1 }
+      +. p2.0
+      *. { p3.1 -. p1.1 }
+      +. p3.0
+      *. { p1.1 -. p2.1 }
+    }
+    /. 2.0,
+  )
+}
+
+pub fn area(layer: Layer) -> Float {
+  case layer {
+    Layer(points: [p1, p2, ..rest], ..) ->
+      list.fold(rest, #(0.0, p1, p2), fn(state, p3) {
+        let #(area, p1, p2) = state
+        #(area +. triangle_area(p1, p2, p3), p2, p3)
+      }).0
+    Stack(layers) ->
+      result.unwrap(list.max(list.map(layers, area), float.compare), 0.0)
+    Fold(top:, bottom:, ..) -> float.max(area(top), area(bottom))
+    _ -> 0.0
   }
 }
 

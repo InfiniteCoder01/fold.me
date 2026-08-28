@@ -1,4 +1,5 @@
 import gleam/float
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -6,7 +7,6 @@ import gleam_community/colour
 import layer.{type Layer} as l
 import paint.{type Vec2} as p
 import paint/event
-import prng/random
 
 fn points2line(a: Vec2, b: Vec2) -> #(Float, Float, Float) {
   #(b.1 -. a.1, a.0 -. b.0, b.0 *. a.1 -. a.0 *. b.1)
@@ -264,106 +264,78 @@ pub fn fold(
 @external(javascript, "./extras.mjs", "time")
 fn time() -> Int
 
-pub fn randomize(layer: Layer, count: Int) -> Layer {
-  case count {
-    0 -> layer
-    count -> {
-      let layer = randomize(layer, count - 1)
-      let points = l.bottommost(layer)
-      let points =
-        list.fold(
-          points,
-          #([], result.lazy_unwrap(list.last(points), fn() { panic })),
-          fn(state, point) {
-            let #(points, last) = state
-            #(
-              [
-                point,
-                #({ point.0 +. last.0 } /. 2.0, { point.1 +. last.1 } /. 2.0),
-                ..points
-              ],
-              point,
-            )
-          },
-        ).0
+pub fn continuous_time() -> Float {
+  int.to_float(time()) /. 1000.0
+}
 
-      case points {
-        [first, ..rest] -> {
-          let seed = random.new_seed(count + time())
-          let #(point, seed) = random.step(random.uniform(first, rest), seed)
-          let #(dx, seed) = random.step(random.uniform(0.0, [-1.0, 1.0]), seed)
-          let #(dy, _) = random.step(random.uniform(0.0, [-1.0, 1.0]), seed)
-          let th =
-            float.max(
-              float.absolute_value(point.0),
-              float.absolute_value(point.1),
-            )
-            /. 3.0
-
-          let cmp = fn(x, fb) {
-            case x <. 0.0 -. th, x >. th {
-              True, False -> -1.0
-              False, False -> fb
-              False, True -> 1.0
-              _, _ -> panic
-            }
-          }
-
-          let line =
-            points2line(point, #(
-              point.0 -. cmp(point.0, dx),
-              point.1 -. cmp(point.1, dy),
-            ))
-
-          case line {
-            #(0.0, 0.0, 0.0) -> layer
-            line -> l.center(fold(layer, line, fn(layer) { layer }).0)
-          }
-        }
-        [] -> layer
-      }
-    }
+pub fn randomize(layer: Layer) -> Layer {
+  let top_layer = l.topmost(layer)
+  let points = case top_layer {
+    l.Layer(points:, ..) -> points
+    _ -> panic
   }
+
+  use point <-
+    fn(callback) {
+      result.unwrap(list.find_map(points |> list.shuffle, callback), layer)
+    }
+
+  let dirs = [
+    #(1.0, 0.0),
+    #(1.0, 1.0),
+    #(0.0, 1.0),
+    #(-1.0, 1.0),
+  ]
+
+  list.find_map(dirs, fn(dir) {
+    let line = points2line(point, #(point.0 +. dir.0, point.1 +. dir.1))
+    case split(top_layer, line) {
+      #(Some(l1), Some(l2), _) ->
+        case float.min(echo l.area(l1), echo l.area(l2)) >. 5.0 {
+          True -> Ok(fold(layer, line, fn(layer) { layer }).0)
+          False -> Error(Nil)
+        }
+      _ -> Error(Nil)
+    }
+  })
 }
 
 // -------------------------------- Interactive
 pub type Paper {
-  Paper(mouse: Vec2, line: Option(Vec2), layers: Layer)
+  Paper(mouse: Vec2, line: Option(Vec2), layers: List(Layer))
 }
 
 pub fn init() -> Paper {
-  Paper(mouse: #(0.0, 0.0), line: None, layers: l.default_stack(1.0))
+  Paper(mouse: #(0.0, 0.0), line: None, layers: [l.default_stack(1.0)])
 }
 
-pub fn update(
-  state: Paper,
-  event: event.Event,
-  on_fold: fn(Layer) -> Layer,
-) -> Paper {
-  case event {
-    event.KeyboardPressed(event.KeySpace) ->
-      Paper(..state, layers: l.align(l.center(state.layers), 0.25))
-    event.MouseMoved(x, y) ->
+pub fn update(state: Paper, event: event.Event) -> Paper {
+  case event, state {
+    event.KeyboardPressed(event.KeyBackspace),
+      Paper(layers: [_, previous, ..rest], ..)
+    -> Paper(..state, layers: [previous, ..rest])
+    event.KeyboardPressed(event.KeySpace), Paper(layers: [layer, ..rest], ..) ->
+      Paper(..state, layers: [l.align(l.center(layer), 4), ..rest])
+    event.MouseMoved(x, y), _ ->
       Paper(..state, mouse: #(
         x -. canvas_width() /. 2.0,
         y -. canvas_height() /. 2.0,
       ))
-    event.MousePressed(event.MouseButtonLeft) ->
+    event.MousePressed(event.MouseButtonLeft), _ ->
       Paper(..state, line: Some(state.mouse))
-    event.MouseReleased(event.MouseButtonLeft) ->
-      case state {
-        Paper(mouse:, line: Some(start), layers:) -> {
-          let fold_line = points2line(start, mouse)
-          Paper(
-            ..state,
-            line: None,
-            layers: on_fold(fold(layers, fold_line, fn(layer) { layer }).0),
-          )
-        }
-        state -> state
-      }
-    event.Tick(_) -> Paper(..state, layers: l.update_animation(state.layers))
-    _ -> state
+    event.MouseReleased(event.MouseButtonLeft),
+      Paper(mouse:, line: Some(start), layers: [layer, ..rest])
+    -> {
+      let fold_line = points2line(start, mouse)
+      Paper(..state, line: None, layers: [
+        fold(layer, fold_line, fn(layer) { layer }).0,
+        layer,
+        ..rest
+      ])
+    }
+    event.Tick(_), Paper(layers: [layer, ..rest], ..) ->
+      Paper(..state, layers: [l.update_animation(layer), ..rest])
+    _, state -> state
   }
 }
 
@@ -376,7 +348,10 @@ pub fn view(state: Paper) -> p.Picture {
   }
 
   p.combine([
-    l.draw_layer(state.layers),
+    case state.layers {
+      [layer, ..] -> l.draw_layer(layer)
+      _ -> p.blank()
+    },
     line,
   ])
   |> p.translate_xy(canvas_width() /. 2.0, canvas_height() /. 2.0)

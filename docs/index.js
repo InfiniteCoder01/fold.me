@@ -330,12 +330,58 @@ function reverse_and_prepend(loop$prefix, loop$suffix) {
 function reverse(list) {
   return reverse_and_prepend(list, List$Empty$const);
 }
+function all_loop(loop$list, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let acc = loop$acc;
+    if (list instanceof Empty) {
+      return new Some(reverse(acc));
+    } else {
+      let $ = list.head;
+      if ($ instanceof Some) {
+        let rest = list.tail;
+        let first = $[0];
+        loop$list = rest;
+        loop$acc = prepend(first, acc);
+      } else {
+        return Option$None$const;
+      }
+    }
+  }
+}
+function all(list) {
+  return all_loop(list, List$Empty$const);
+}
+function from_result(result) {
+  if (result instanceof Ok) {
+    let a = result[0];
+    return new Some(a);
+  } else {
+    return Option$None$const;
+  }
+}
 function unwrap(option, default$) {
   if (option instanceof Some) {
     let x = option[0];
     return x;
   } else {
     return default$;
+  }
+}
+function map(option, fun) {
+  if (option instanceof Some) {
+    let x = option[0];
+    return new Some(fun(x));
+  } else {
+    return option;
+  }
+}
+function then$(option, fun) {
+  if (option instanceof Some) {
+    let x = option[0];
+    return fun(x);
+  } else {
+    return option;
   }
 }
 function values_loop(loop$list, loop$acc) {
@@ -361,6 +407,21 @@ function values_loop(loop$list, loop$acc) {
 }
 function values(options) {
   return values_loop(options, List$Empty$const);
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/int.mjs
+function power2(base, exponent) {
+  let _pipe = base;
+  let _pipe$1 = identity(_pipe);
+  return power(_pipe$1, exponent);
+}
+function min(a, b) {
+  let $ = a < b;
+  if ($) {
+    return a;
+  } else {
+    return b;
+  }
 }
 
 // build/dev/javascript/gleam_stdlib/dict.mjs
@@ -540,6 +601,14 @@ class Node {
     return hash;
   }
 }
+var emptyNode = /* @__PURE__ */ newNode(0);
+var emptyDict = /* @__PURE__ */ new Dict(0, emptyNode);
+function newNode(generation) {
+  return new Node(generation, 0, 0, []);
+}
+function make() {
+  return emptyDict;
+}
 function fold(dict, state, fun) {
   const queue = [dict.root];
   while (queue.length) {
@@ -569,6 +638,22 @@ var Sorting$Ascending$const = new Ascending;
 class Descending extends CustomType {
 }
 var Sorting$Descending$const = new Descending;
+function length_loop(loop$list, loop$count) {
+  while (true) {
+    let list = loop$list;
+    let count = loop$count;
+    if (list instanceof Empty) {
+      return count;
+    } else {
+      let list$1 = list.tail;
+      loop$list = list$1;
+      loop$count = count + 1;
+    }
+  }
+}
+function length(list) {
+  return length_loop(list, 0);
+}
 function reverse_and_prepend2(loop$prefix, loop$suffix) {
   while (true) {
     let prefix = loop$prefix;
@@ -613,8 +698,30 @@ function map_loop(loop$list, loop$fun, loop$acc) {
     }
   }
 }
-function map2(list, fun) {
+function map3(list, fun) {
   return map_loop(list, fun, List$Empty$const);
+}
+function index_map_loop(loop$list, loop$fun, loop$index, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let fun = loop$fun;
+    let index = loop$index;
+    let acc = loop$acc;
+    if (list instanceof Empty) {
+      return reverse2(acc);
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      let acc$1 = prepend(fun(first$1, index), acc);
+      loop$list = rest$1;
+      loop$fun = fun;
+      loop$index = index + 1;
+      loop$acc = acc$1;
+    }
+  }
+}
+function index_map(list, fun) {
+  return index_map_loop(list, fun, 0, List$Empty$const);
 }
 function append_loop(loop$first, loop$second) {
   while (true) {
@@ -650,6 +757,9 @@ function flatten_loop(loop$lists, loop$acc) {
 function flatten(lists) {
   return flatten_loop(lists, List$Empty$const);
 }
+function flat_map(list, fun) {
+  return flatten(map3(list, fun));
+}
 function fold2(loop$list, loop$initial, loop$fun) {
   while (true) {
     let list = loop$list;
@@ -664,6 +774,15 @@ function fold2(loop$list, loop$initial, loop$fun) {
       loop$initial = fun(initial, first$1);
       loop$fun = fun;
     }
+  }
+}
+function fold_right(list, initial, fun) {
+  if (list instanceof Empty) {
+    return initial;
+  } else {
+    let first$1 = list.head;
+    let rest$1 = list.tail;
+    return fun(fold_right(rest$1, initial, fun), first$1);
   }
 }
 function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
@@ -687,6 +806,25 @@ function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
 function index_fold(list, initial, fun) {
   return index_fold_loop(list, initial, fun, 0);
 }
+function find_map(loop$list, loop$fun) {
+  while (true) {
+    let list = loop$list;
+    let fun = loop$fun;
+    if (list instanceof Empty) {
+      return new Error(undefined);
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      let $ = fun(first$1);
+      if ($ instanceof Ok) {
+        return $;
+      } else {
+        loop$list = rest$1;
+        loop$fun = fun;
+      }
+    }
+  }
+}
 function zip_loop(loop$one, loop$other, loop$acc) {
   while (true) {
     let one = loop$one;
@@ -709,6 +847,349 @@ function zip_loop(loop$one, loop$other, loop$acc) {
 }
 function zip(list, other) {
   return zip_loop(list, other, List$Empty$const);
+}
+function strict_zip_loop(loop$one, loop$other, loop$acc) {
+  while (true) {
+    let one = loop$one;
+    let other = loop$other;
+    let acc = loop$acc;
+    if (one instanceof Empty) {
+      if (other instanceof Empty) {
+        return new Ok(reverse2(acc));
+      } else {
+        return new Error(undefined);
+      }
+    } else if (other instanceof Empty) {
+      return new Error(undefined);
+    } else {
+      let first_one = one.head;
+      let rest_one = one.tail;
+      let first_other = other.head;
+      let rest_other = other.tail;
+      loop$one = rest_one;
+      loop$other = rest_other;
+      loop$acc = prepend([first_one, first_other], acc);
+    }
+  }
+}
+function strict_zip(list, other) {
+  return strict_zip_loop(list, other, List$Empty$const);
+}
+function merge_descendings(loop$list1, loop$list2, loop$compare, loop$acc) {
+  while (true) {
+    let list1 = loop$list1;
+    let list2 = loop$list2;
+    let compare2 = loop$compare;
+    let acc = loop$acc;
+    if (list1 instanceof Empty) {
+      let list = list2;
+      return reverse_and_prepend2(list, acc);
+    } else if (list2 instanceof Empty) {
+      let list = list1;
+      return reverse_and_prepend2(list, acc);
+    } else {
+      let first1 = list1.head;
+      let rest1 = list1.tail;
+      let first2 = list2.head;
+      let rest2 = list2.tail;
+      let $ = compare2(first1, first2);
+      if ($ instanceof Lt) {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare2;
+        loop$acc = prepend(first2, acc);
+      } else if ($ instanceof Eq) {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare2;
+        loop$acc = prepend(first1, acc);
+      } else {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare2;
+        loop$acc = prepend(first1, acc);
+      }
+    }
+  }
+}
+function merge_descending_pairs(loop$sequences, loop$compare, loop$acc) {
+  while (true) {
+    let sequences = loop$sequences;
+    let compare2 = loop$compare;
+    let acc = loop$acc;
+    if (sequences instanceof Empty) {
+      return reverse2(acc);
+    } else {
+      let $ = sequences.tail;
+      if ($ instanceof Empty) {
+        let sequence = sequences.head;
+        return reverse2(prepend(reverse2(sequence), acc));
+      } else {
+        let descending1 = sequences.head;
+        let descending2 = $.head;
+        let rest$1 = $.tail;
+        let ascending = merge_descendings(descending1, descending2, compare2, List$Empty$const);
+        loop$sequences = rest$1;
+        loop$compare = compare2;
+        loop$acc = prepend(ascending, acc);
+      }
+    }
+  }
+}
+function merge_ascendings(loop$list1, loop$list2, loop$compare, loop$acc) {
+  while (true) {
+    let list1 = loop$list1;
+    let list2 = loop$list2;
+    let compare2 = loop$compare;
+    let acc = loop$acc;
+    if (list1 instanceof Empty) {
+      let list = list2;
+      return reverse_and_prepend2(list, acc);
+    } else if (list2 instanceof Empty) {
+      let list = list1;
+      return reverse_and_prepend2(list, acc);
+    } else {
+      let first1 = list1.head;
+      let rest1 = list1.tail;
+      let first2 = list2.head;
+      let rest2 = list2.tail;
+      let $ = compare2(first1, first2);
+      if ($ instanceof Lt) {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare2;
+        loop$acc = prepend(first1, acc);
+      } else if ($ instanceof Eq) {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare2;
+        loop$acc = prepend(first2, acc);
+      } else {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare2;
+        loop$acc = prepend(first2, acc);
+      }
+    }
+  }
+}
+function merge_ascending_pairs(loop$sequences, loop$compare, loop$acc) {
+  while (true) {
+    let sequences = loop$sequences;
+    let compare2 = loop$compare;
+    let acc = loop$acc;
+    if (sequences instanceof Empty) {
+      return reverse2(acc);
+    } else {
+      let $ = sequences.tail;
+      if ($ instanceof Empty) {
+        let sequence = sequences.head;
+        return reverse2(prepend(reverse2(sequence), acc));
+      } else {
+        let ascending1 = sequences.head;
+        let ascending2 = $.head;
+        let rest$1 = $.tail;
+        let descending = merge_ascendings(ascending1, ascending2, compare2, List$Empty$const);
+        loop$sequences = rest$1;
+        loop$compare = compare2;
+        loop$acc = prepend(descending, acc);
+      }
+    }
+  }
+}
+function merge_all(loop$sequences, loop$direction, loop$compare) {
+  while (true) {
+    let sequences = loop$sequences;
+    let direction = loop$direction;
+    let compare2 = loop$compare;
+    if (sequences instanceof Empty) {
+      return sequences;
+    } else if (direction instanceof Ascending) {
+      let $ = sequences.tail;
+      if ($ instanceof Empty) {
+        let sequence = sequences.head;
+        return sequence;
+      } else {
+        let sequences$1 = merge_ascending_pairs(sequences, compare2, List$Empty$const);
+        loop$sequences = sequences$1;
+        loop$direction = Sorting$Descending$const;
+        loop$compare = compare2;
+      }
+    } else {
+      let $ = sequences.tail;
+      if ($ instanceof Empty) {
+        let sequence = sequences.head;
+        return reverse2(sequence);
+      } else {
+        let sequences$1 = merge_descending_pairs(sequences, compare2, List$Empty$const);
+        loop$sequences = sequences$1;
+        loop$direction = Sorting$Ascending$const;
+        loop$compare = compare2;
+      }
+    }
+  }
+}
+function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$prev, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let compare2 = loop$compare;
+    let growing = loop$growing;
+    let direction = loop$direction;
+    let prev = loop$prev;
+    let acc = loop$acc;
+    let growing$1 = prepend(prev, growing);
+    if (list instanceof Empty) {
+      if (direction instanceof Ascending) {
+        return prepend(reverse2(growing$1), acc);
+      } else {
+        return prepend(growing$1, acc);
+      }
+    } else {
+      let new$1 = list.head;
+      let rest$1 = list.tail;
+      let $ = compare2(prev, new$1);
+      if (direction instanceof Ascending) {
+        if ($ instanceof Lt) {
+          loop$list = rest$1;
+          loop$compare = compare2;
+          loop$growing = growing$1;
+          loop$direction = direction;
+          loop$prev = new$1;
+          loop$acc = acc;
+        } else if ($ instanceof Eq) {
+          loop$list = rest$1;
+          loop$compare = compare2;
+          loop$growing = growing$1;
+          loop$direction = direction;
+          loop$prev = new$1;
+          loop$acc = acc;
+        } else {
+          let _block;
+          if (direction instanceof Ascending) {
+            _block = prepend(reverse2(growing$1), acc);
+          } else {
+            _block = prepend(growing$1, acc);
+          }
+          let acc$1 = _block;
+          if (rest$1 instanceof Empty) {
+            return prepend(toList([new$1]), acc$1);
+          } else {
+            let next = rest$1.head;
+            let rest$2 = rest$1.tail;
+            let _block$1;
+            let $1 = compare2(new$1, next);
+            if ($1 instanceof Lt) {
+              _block$1 = Sorting$Ascending$const;
+            } else if ($1 instanceof Eq) {
+              _block$1 = Sorting$Ascending$const;
+            } else {
+              _block$1 = Sorting$Descending$const;
+            }
+            let direction$1 = _block$1;
+            loop$list = rest$2;
+            loop$compare = compare2;
+            loop$growing = toList([new$1]);
+            loop$direction = direction$1;
+            loop$prev = next;
+            loop$acc = acc$1;
+          }
+        }
+      } else if ($ instanceof Lt) {
+        let _block;
+        if (direction instanceof Ascending) {
+          _block = prepend(reverse2(growing$1), acc);
+        } else {
+          _block = prepend(growing$1, acc);
+        }
+        let acc$1 = _block;
+        if (rest$1 instanceof Empty) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let _block$1;
+          let $1 = compare2(new$1, next);
+          if ($1 instanceof Lt) {
+            _block$1 = Sorting$Ascending$const;
+          } else if ($1 instanceof Eq) {
+            _block$1 = Sorting$Ascending$const;
+          } else {
+            _block$1 = Sorting$Descending$const;
+          }
+          let direction$1 = _block$1;
+          loop$list = rest$2;
+          loop$compare = compare2;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      } else if ($ instanceof Eq) {
+        let _block;
+        if (direction instanceof Ascending) {
+          _block = prepend(reverse2(growing$1), acc);
+        } else {
+          _block = prepend(growing$1, acc);
+        }
+        let acc$1 = _block;
+        if (rest$1 instanceof Empty) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let _block$1;
+          let $1 = compare2(new$1, next);
+          if ($1 instanceof Lt) {
+            _block$1 = Sorting$Ascending$const;
+          } else if ($1 instanceof Eq) {
+            _block$1 = Sorting$Ascending$const;
+          } else {
+            _block$1 = Sorting$Descending$const;
+          }
+          let direction$1 = _block$1;
+          loop$list = rest$2;
+          loop$compare = compare2;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      } else {
+        loop$list = rest$1;
+        loop$compare = compare2;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      }
+    }
+  }
+}
+function sort(list, compare2) {
+  if (list instanceof Empty) {
+    return list;
+  } else {
+    let $ = list.tail;
+    if ($ instanceof Empty) {
+      return list;
+    } else {
+      let x = list.head;
+      let y = $.head;
+      let rest$1 = $.tail;
+      let _block;
+      let $1 = compare2(x, y);
+      if ($1 instanceof Lt) {
+        _block = Sorting$Ascending$const;
+      } else if ($1 instanceof Eq) {
+        _block = Sorting$Ascending$const;
+      } else {
+        _block = Sorting$Descending$const;
+      }
+      let direction = _block;
+      let sequences$1 = sequences(rest$1, compare2, toList([x]), direction, y, List$Empty$const);
+      return merge_all(sequences$1, Sorting$Ascending$const, compare2);
+    }
+  }
 }
 function repeat_loop(loop$item, loop$times, loop$acc) {
   while (true) {
@@ -768,6 +1249,28 @@ function chunk(list, f) {
     return chunk_loop(rest$1, f, f(first$1), toList([first$1]), List$Empty$const);
   }
 }
+function scan_loop(loop$list, loop$accumulator, loop$accumulated, loop$fun) {
+  while (true) {
+    let list = loop$list;
+    let accumulator = loop$accumulator;
+    let accumulated = loop$accumulated;
+    let fun = loop$fun;
+    if (list instanceof Empty) {
+      return reverse2(accumulated);
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      let next = fun(accumulator, first$1);
+      loop$list = rest$1;
+      loop$accumulator = next;
+      loop$accumulated = prepend(next, accumulated);
+      loop$fun = fun;
+    }
+  }
+}
+function scan(list, initial, fun) {
+  return scan_loop(list, initial, List$Empty$const, fun);
+}
 function last(loop$list) {
   while (true) {
     let list = loop$list;
@@ -783,6 +1286,108 @@ function last(loop$list) {
         loop$list = rest$1;
       }
     }
+  }
+}
+function shuffle_pair_unwrap_loop(loop$list, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let acc = loop$acc;
+    if (list instanceof Empty) {
+      return acc;
+    } else {
+      let elem_pair = list.head;
+      let enumerable = list.tail;
+      loop$list = enumerable;
+      loop$acc = prepend(elem_pair[1], acc);
+    }
+  }
+}
+function do_shuffle_by_pair_indexes(list_of_pairs) {
+  return sort(list_of_pairs, (a_pair, b_pair) => {
+    return compare(a_pair[0], b_pair[0]);
+  });
+}
+function shuffle(list) {
+  let _pipe = list;
+  let _pipe$1 = fold2(_pipe, List$Empty$const, (acc, a) => {
+    return prepend([random_uniform(), a], acc);
+  });
+  let _pipe$2 = do_shuffle_by_pair_indexes(_pipe$1);
+  return shuffle_pair_unwrap_loop(_pipe$2, List$Empty$const);
+}
+function max_loop(loop$list, loop$compare, loop$max) {
+  while (true) {
+    let list = loop$list;
+    let compare2 = loop$compare;
+    let max = loop$max;
+    if (list instanceof Empty) {
+      return max;
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      let $ = compare2(first$1, max);
+      if ($ instanceof Lt) {
+        loop$list = rest$1;
+        loop$compare = compare2;
+        loop$max = max;
+      } else if ($ instanceof Eq) {
+        loop$list = rest$1;
+        loop$compare = compare2;
+        loop$max = max;
+      } else {
+        loop$list = rest$1;
+        loop$compare = compare2;
+        loop$max = first$1;
+      }
+    }
+  }
+}
+function max(list, compare2) {
+  if (list instanceof Empty) {
+    return new Error(undefined);
+  } else {
+    let first$1 = list.head;
+    let rest$1 = list.tail;
+    return new Ok(max_loop(rest$1, compare2, first$1));
+  }
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/string_tree.mjs
+class All extends CustomType {
+}
+var Direction$All$const = new All;
+
+// build/dev/javascript/gleam_stdlib/gleam/string.mjs
+class Leading extends CustomType {
+}
+var Direction$Leading$const = new Leading;
+
+class Trailing extends CustomType {
+}
+var Direction$Trailing$const = new Trailing;
+function join_loop(loop$strings, loop$separator, loop$accumulator) {
+  while (true) {
+    let strings = loop$strings;
+    let separator = loop$separator;
+    let accumulator = loop$accumulator;
+    if (strings instanceof Empty) {
+      return accumulator;
+    } else {
+      let string = strings.head;
+      let strings$1 = strings.tail;
+      loop$strings = strings$1;
+      loop$separator = separator;
+      loop$accumulator = accumulator + separator + string;
+    }
+  }
+}
+function join(strings, separator) {
+  if (strings instanceof Empty) {
+    return "";
+  } else {
+    let first$1 = strings.head;
+    let rest = strings.tail;
+    return join_loop(rest, separator, first$1);
   }
 }
 
@@ -836,11 +1441,21 @@ var trim_end_regex = /* @__PURE__ */ new RegExp(`[${unicode_whitespaces}]*$`);
 function ceiling(float2) {
   return Math.ceil(float2);
 }
+function floor(float2) {
+  return Math.floor(float2);
+}
 function round2(float2) {
   return Math.round(float2);
 }
-function power(base, exponent) {
+function power3(base, exponent) {
   return Math.pow(base, exponent);
+}
+function random_uniform() {
+  const random_uniform_result = Math.random();
+  if (random_uniform_result === 1) {
+    return random_uniform();
+  }
+  return random_uniform_result;
 }
 var MIN_I32 = -(2 ** 31);
 var MAX_I32 = 2 ** 31 - 1;
@@ -955,10 +1570,10 @@ class Inspector {
     const head = name === "Object" ? "" : name + " ";
     return `//js(${head}{${body}})`;
   }
-  #dict(map3) {
+  #dict(map4) {
     let body = "dict.from_list([";
     let first2 = true;
-    body = fold(map3, body, (body2, key, value) => {
+    body = fold(map4, body, (body2, key, value) => {
       if (!first2)
         body2 = body2 + ", ";
       first2 = false;
@@ -1036,8 +1651,8 @@ class Inspector {
     new_str += '"';
     return new_str;
   }
-  #utfCodepoint(codepoint) {
-    return `//utfcodepoint(${String.fromCodePoint(codepoint.value)})`;
+  #utfCodepoint(codepoint2) {
+    return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
   }
   #bit_array(bits2) {
     if (bits2.bitSize === 0) {
@@ -1072,6 +1687,43 @@ function isList(data) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
+function max2(a, b) {
+  let $ = a > b;
+  if ($) {
+    return a;
+  } else {
+    return b;
+  }
+}
+function min2(a, b) {
+  let $ = a < b;
+  if ($) {
+    return a;
+  } else {
+    return b;
+  }
+}
+function compare(a, b) {
+  let $ = a === b;
+  if ($) {
+    return Order$Eq$const;
+  } else {
+    let $1 = a < b;
+    if ($1) {
+      return Order$Lt$const;
+    } else {
+      return Order$Gt$const;
+    }
+  }
+}
+function absolute_value(x) {
+  let $ = x >= 0;
+  if ($) {
+    return x;
+  } else {
+    return 0 - x;
+  }
+}
 function negate(x) {
   return -1 * x;
 }
@@ -1083,13 +1735,23 @@ function round(x) {
     return 0 - round2(negate(x));
   }
 }
-function power2(base, exponent) {
+function power(base, exponent) {
   let fractional = ceiling(exponent) - exponent > 0;
   let $ = base < 0 && fractional || base === 0 && exponent < 0;
   if ($) {
     return new Error(undefined);
   } else {
-    return new Ok(power(base, exponent));
+    return new Ok(power3(base, exponent));
+  }
+}
+function square_root(x) {
+  return power(x, 0.5);
+}
+function modulo(dividend, divisor) {
+  if (divisor === 0) {
+    return new Error(undefined);
+  } else {
+    return new Ok(dividend - floor(divideFloat(dividend, divisor)) * divisor);
   }
 }
 function divide(a, b) {
@@ -1104,52 +1766,6 @@ function multiply(a, b) {
   return a * b;
 }
 
-// build/dev/javascript/gleam_stdlib/gleam/int.mjs
-function power3(base, exponent) {
-  let _pipe = base;
-  let _pipe$1 = identity(_pipe);
-  return power2(_pipe$1, exponent);
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/string_tree.mjs
-class All extends CustomType {
-}
-var Direction$All$const = new All;
-
-// build/dev/javascript/gleam_stdlib/gleam/string.mjs
-class Leading extends CustomType {
-}
-var Direction$Leading$const = new Leading;
-
-class Trailing extends CustomType {
-}
-var Direction$Trailing$const = new Trailing;
-function join_loop(loop$strings, loop$separator, loop$accumulator) {
-  while (true) {
-    let strings = loop$strings;
-    let separator = loop$separator;
-    let accumulator = loop$accumulator;
-    if (strings instanceof Empty) {
-      return accumulator;
-    } else {
-      let string2 = strings.head;
-      let strings$1 = strings.tail;
-      loop$strings = strings$1;
-      loop$separator = separator;
-      loop$accumulator = accumulator + separator + string2;
-    }
-  }
-}
-function join(strings, separator) {
-  if (strings instanceof Empty) {
-    return "";
-  } else {
-    let first$1 = strings.head;
-    let rest = strings.tail;
-    return join_loop(rest, separator, first$1);
-  }
-}
-
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
 function try$(result, fun) {
   if (result instanceof Ok) {
@@ -1157,6 +1773,14 @@ function try$(result, fun) {
     return fun(x);
   } else {
     return result;
+  }
+}
+function unwrap2(result, default$) {
+  if (result instanceof Ok) {
+    let v = result[0];
+    return v;
+  } else {
+    return default$;
   }
 }
 function lazy_unwrap(result, default$) {
@@ -1254,7 +1878,7 @@ function hex_string_to_int(hex_string) {
           return parse_int(char);
         }
       })(), (num) => {
-        return try$(power3(16, identity(index2)), (base) => {
+        return try$(power2(16, identity(index2)), (base) => {
           return new Ok(v + round(identity(num) * base));
         });
       });
@@ -1654,6 +2278,41 @@ function path(start, segments) {
 function path_line(to) {
   return new LineTo(to);
 }
+function text(text2, font_size) {
+  return new Text(text2, font_size);
+}
+function text_align(picture, alignment) {
+  return new TextAlign(picture, (() => {
+    if (alignment instanceof TextAlignStart2) {
+      return TextAlign$TextAlignStart$const;
+    } else if (alignment instanceof TextAlignEnd2) {
+      return TextAlign$TextAlignEnd$const;
+    } else if (alignment instanceof TextAlignLeft2) {
+      return TextAlign$TextAlignLeft$const;
+    } else if (alignment instanceof TextAlignRight2) {
+      return TextAlign$TextAlignRight$const;
+    } else {
+      return TextAlign$TextAlignCenter$const;
+    }
+  })());
+}
+function text_baseline(picture, baseline) {
+  return new TextBaseline(picture, (() => {
+    if (baseline instanceof TextBaselineTop2) {
+      return TextBaseline$TextBaselineTop$const;
+    } else if (baseline instanceof TextBaselineHanging2) {
+      return TextBaseline$TextBaselineHanging$const;
+    } else if (baseline instanceof TextBaselineMiddle2) {
+      return TextBaseline$TextBaselineMiddle$const;
+    } else if (baseline instanceof TextBaselineAlphabetic2) {
+      return TextBaseline$TextBaselineAlphabetic$const;
+    } else if (baseline instanceof TextBaselineIdeographic2) {
+      return TextBaseline$TextBaselineIdeographic$const;
+    } else {
+      return TextBaseline$TextBaselineBottom$const;
+    }
+  })());
+}
 function translate_xy(picture, x, y) {
   return new Translate(picture, [x, y]);
 }
@@ -1893,9 +2552,9 @@ function arc_corner(ctx, x1, y1, x2, y2, radius) {
 function bezier_to(ctx, cp1x, cp1y, cp2x, cp2y, x, y) {
   ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
 }
-function text(ctx, text2, font) {
+function text2(ctx, text3, font) {
   ctx.font = font;
-  ctx.fillText(text2, 0, 0);
+  ctx.fillText(text3, 0, 0);
 }
 function set_text_align(ctx, value) {
   ctx.textAlign = value;
@@ -2015,10 +2674,10 @@ function display_on_rendering_context(loop$picture, loop$ctx, loop$state) {
         return add_segments_to_rendering_context(segments, _capture);
       }, state.fill, state.stroke);
     } else if (picture instanceof Text) {
-      let text2 = picture.text;
+      let text3 = picture.text;
       let size_px = picture.size_px;
       save(ctx);
-      text(ctx, text2, to_string(size_px) + "px " + state.font_family);
+      text2(ctx, text3, to_string(size_px) + "px " + state.font_family);
       return restore(ctx);
     } else if (picture instanceof ImageRef) {
       let width_px = picture.width_px;
@@ -2307,7 +2966,7 @@ function interact(init, update, view, selector) {
   return setup_request_animation_frame(get_tick_func(ctx, view, update, selector));
 }
 
-// build/dev/javascript/paper/canvas_extra.mjs
+// build/dev/javascript/paper/extras.mjs
 function width() {
   const canvas = document.getElementById("mycanvas");
   return canvas.width;
@@ -2316,8 +2975,43 @@ function height() {
   const canvas = document.getElementById("mycanvas");
   return canvas.height;
 }
-// build/dev/javascript/paper/folding.mjs
-var FILEPATH4 = "src/folding.gleam";
+function time() {
+  return Date.now();
+}
+// build/dev/javascript/gleam_yielder/gleam/yielder.mjs
+class Stop extends CustomType {
+}
+var Action$Stop$const = new Stop;
+class Done extends CustomType {
+}
+var Step$Done$const = new Done;
+class NoMore extends CustomType {
+}
+var SizedChunk$NoMore$const = new NoMore;
+// build/dev/javascript/gleam_community_maths/maths.mjs
+function sin(float4) {
+  return Math.sin(float4);
+}
+function atan2(floaty, floatx) {
+  return Math.atan2(floaty, floatx);
+}
+function cos(float4) {
+  return Math.cos(float4);
+}
+
+// build/dev/javascript/gleam_community_maths/gleam_community/maths.mjs
+function sin2(x) {
+  return sin(x);
+}
+function cos2(x) {
+  return cos(x);
+}
+function atan22(y, x) {
+  return atan2(y, x);
+}
+
+// build/dev/javascript/paper/layer.mjs
+var FILEPATH4 = "src/layer.gleam";
 
 class Layer extends CustomType {
   constructor(points, animation, color) {
@@ -2334,17 +3028,333 @@ class Stack extends CustomType {
   }
 }
 class Fold extends CustomType {
-  constructor(top, bottom, fold3) {
+  constructor(top, bottom, crease) {
     super();
     this.top = top;
     this.bottom = bottom;
-    this.fold = fold3;
+    this.crease = crease;
   }
 }
+function paper(points, color) {
+  return new Layer(points, map3(points, (_) => {
+    return [0, 0];
+  }), color);
+}
+function paper_rect(pos, size3, color) {
+  return paper(toList([
+    [pos[0] - size3[0] / 2, pos[1] - size3[1] / 2],
+    [pos[0] + size3[0] / 2, pos[1] - size3[1] / 2],
+    [pos[0] + size3[0] / 2, pos[1] + size3[1] / 2],
+    [pos[0] - size3[0] / 2, pos[1] + size3[1] / 2]
+  ]), color);
+}
+function default_stack(scale2) {
+  return new Stack(toList([
+    paper_rect([0, 0], [300 * scale2, 500 * scale2], colour_hex("#C0BAA8")),
+    paper_rect([0, 0], [300 * scale2, 500 * scale2], colour_hex("#F1E9D2"))
+  ]));
+}
+function transform(layer, callback) {
+  if (layer instanceof Layer) {
+    let points = layer.points;
+    return new Layer(map3(points, callback), layer.animation, layer.color);
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return new Stack(map3(layers, (_capture) => {
+      return transform(_capture, callback);
+    }));
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    let p1 = layer.crease[0];
+    let p2 = layer.crease[1];
+    return new Fold(transform(top, callback), transform(bottom, callback), [callback(p1), callback(p2)]);
+  }
+}
+function all_points(layer) {
+  if (layer instanceof Layer) {
+    let points = layer.points;
+    return points;
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return flat_map(layers, all_points);
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    return append(all_points(top), all_points(bottom));
+  }
+}
+function flip(layer, flip_line) {
+  let reflect = (point, line) => {
+    let a = line[0];
+    let b = line[1];
+    let c = line[2];
+    let x = point[0];
+    let y = point[1];
+    let k = divideFloat(2 * (a * x + b * y + c), a * a + b * b);
+    return [x - a * k, y - b * k];
+  };
+  if (layer instanceof Layer) {
+    let points = layer.points;
+    return new Layer(map3(points, (_capture) => {
+      return reflect(_capture, flip_line);
+    }), layer.animation, layer.color);
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return new Stack(reverse2(map3(layers, (_capture) => {
+      return flip(_capture, flip_line);
+    })));
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    let p1 = layer.crease[0];
+    let p2 = layer.crease[1];
+    return new Fold(flip(bottom, flip_line), flip(top, flip_line), [reflect(p1, flip_line), reflect(p2, flip_line)]);
+  }
+}
+function center(layer) {
+  let points = all_points(layer);
+  let count = identity(length(points));
+  let center$1 = fold2(points, [0, 0], (center2, point) => {
+    return [center2[0] + point[0], center2[1] + point[1]];
+  });
+  let center$2 = [
+    divideFloat(center$1[0], count),
+    divideFloat(center$1[1], count)
+  ];
+  return transform(layer, (p) => {
+    return [p[0] - center$2[0], p[1] - center$2[1]];
+  });
+}
+function bottommost(loop$layer) {
+  while (true) {
+    let layer = loop$layer;
+    if (layer instanceof Layer) {
+      let points = layer.points;
+      return points;
+    } else if (layer instanceof Stack) {
+      let $ = layer[0];
+      if ($ instanceof Empty) {
+        return List$Empty$const;
+      } else {
+        let layer$1 = $.head;
+        loop$layer = layer$1;
+      }
+    } else {
+      let layer$1 = layer.bottom;
+      loop$layer = layer$1;
+    }
+  }
+}
+function topmost(loop$layer) {
+  while (true) {
+    let layer = loop$layer;
+    if (layer instanceof Layer) {
+      return layer;
+    } else if (layer instanceof Stack) {
+      let layers = layer[0];
+      loop$layer = lazy_unwrap(last(layers), () => {
+        throw makeError("panic", FILEPATH4, "layer", 112, "topmost", "`panic` expression evaluated.", {});
+      });
+    } else {
+      let layer$1 = layer.top;
+      loop$layer = layer$1;
+    }
+  }
+}
+function align(layer, segments) {
+  let $ = bottommost(layer);
+  if ($ instanceof Empty) {
+    return layer;
+  } else {
+    let $1 = $.tail;
+    if ($1 instanceof Empty) {
+      return layer;
+    } else {
+      let p1 = $.head;
+      let p2 = $1.head;
+      let angle = atan22(p2[1] - p1[1], p2[0] - p1[0]);
+      let angle_mod = divideFloat(6.2831852, identity(segments));
+      let angle$1 = unwrap2(modulo(angle, angle_mod), angle);
+      let _block;
+      let $2 = angle_mod - angle$1 < angle$1;
+      if ($2) {
+        _block = angle$1 - angle_mod;
+      } else {
+        _block = angle$1;
+      }
+      let angle$2 = _block;
+      let sin3 = sin2(0 - angle$2);
+      let cos3 = cos2(0 - angle$2);
+      return transform(layer, (p) => {
+        return [p[0] * cos3 - p[1] * sin3, p[0] * sin3 + p[1] * cos3];
+      });
+    }
+  }
+}
+function triangle_area(p1, p2, p3) {
+  return absolute_value((p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1]) + p3[0] * (p1[1] - p2[1])) / 2);
+}
+function area(layer) {
+  if (layer instanceof Layer) {
+    let $ = layer.points;
+    if ($ instanceof Empty) {
+      return 0;
+    } else {
+      let $1 = $.tail;
+      if ($1 instanceof Empty) {
+        return 0;
+      } else {
+        let p1 = $.head;
+        let p2 = $1.head;
+        let rest = $1.tail;
+        return fold2(rest, [0, p1, p2], (state, p3) => {
+          let area$1 = state[0];
+          let p1$1 = state[1];
+          let p2$1 = state[2];
+          return [area$1 + triangle_area(p1$1, p2$1, p3), p2$1, p3];
+        })[0];
+      }
+    }
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return unwrap2(max(map3(layers, area), compare), 0);
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    return max2(area(top), area(bottom));
+  }
+}
+function update_animation(layer) {
+  if (layer instanceof Layer) {
+    let points = layer.points;
+    let animation = layer.animation;
+    return new Layer(points, map3(zip(points, animation), (e) => {
+      let target = e[0];
+      let p = e[1];
+      return [
+        p[0] + (target[0] - p[0]) * 0.1,
+        p[1] + (target[1] - p[1]) * 0.1
+      ];
+    }), layer.color);
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return new Stack(map3(layers, update_animation));
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    return new Fold(update_animation(top), update_animation(bottom), layer.crease);
+  }
+}
+function draw_layer(layer) {
+  if (layer instanceof Layer) {
+    let $ = layer.animation;
+    if ($ instanceof Empty) {
+      return blank();
+    } else {
+      let $1 = $.tail;
+      if ($1 instanceof Empty) {
+        return blank();
+      } else {
+        let color = layer.color;
+        let p1 = $.head;
+        let p2 = $1.head;
+        let rest = $1.tail;
+        let _pipe = path(p1, flatten(toList([
+          toList([path_line(p2)]),
+          map3(rest, path_line),
+          toList([path_line(p1), path_line(p2)])
+        ])));
+        let _pipe$1 = stroke(_pipe, black, 3);
+        return fill(_pipe$1, color);
+      }
+    }
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return combine(map3(layers, draw_layer));
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    return concat2(draw_layer(bottom), draw_layer(top));
+  }
+}
+function match(a, b, scale2) {
+  let combine2 = (scores) => {
+    return map(all(scores), (scores2) => {
+      let count = identity(length(scores2));
+      return divideFloat(fold2(scores2, 0, (a2, b2) => {
+        return a2 + b2;
+      }), count);
+    });
+  };
+  if (a instanceof Layer) {
+    if (b instanceof Layer) {
+      let color1 = a.color;
+      let color2 = b.color;
+      if (isEqual(color1, color2)) {
+        let points1 = a.points;
+        let points2 = b.points;
+        let points2$1 = map3(points2, (p) => {
+          return [divideFloat(p[0], scale2), divideFloat(p[1], scale2)];
+        });
+        let closest = (p, set) => {
+          return unwrap2(square_root(fold2(set, 1e6, (dst, p2) => {
+            let $2 = [p2[0] - p[0], p2[1] - p[1]];
+            let dx = $2[0];
+            let dy = $2[1];
+            return min2(dst, dx * dx + dy * dy);
+          })), 0);
+        };
+        let distances = append(map3(points1, (_capture) => {
+          return closest(_capture, points2$1);
+        }), map3(points2$1, (_capture) => {
+          return closest(_capture, points1);
+        }));
+        let count = identity(length(distances));
+        let score = divideFloat(fold2(distances, 0, (score2, dst) => {
+          return score2 + 1 - dst * dst / 1e4;
+        }), count);
+        let $ = score >= 0.2;
+        if ($) {
+          return new Some(score);
+        } else {
+          return Option$None$const;
+        }
+      } else {
+        return Option$None$const;
+      }
+    } else {
+      return Option$None$const;
+    }
+  } else if (a instanceof Stack) {
+    if (b instanceof Stack) {
+      let layers1 = a[0];
+      let layers2 = b[0];
+      return then$(from_result(strict_zip(layers1, layers2)), (pairs) => {
+        return combine2(map3(pairs, (pair) => {
+          return match(pair[0], pair[1], scale2);
+        }));
+      });
+    } else {
+      return Option$None$const;
+    }
+  } else if (b instanceof Fold) {
+    let top1 = a.top;
+    let bottom1 = a.bottom;
+    let top2 = b.top;
+    let bottom2 = b.bottom;
+    return combine2(toList([match(top1, top2, scale2), match(bottom1, bottom2, scale2)]));
+  } else {
+    return Option$None$const;
+  }
+}
+
+// build/dev/javascript/paper/folding.mjs
+var FILEPATH5 = "src/folding.gleam";
+
 class Paper extends CustomType {
-  constructor(space, mouse, line, layers) {
+  constructor(mouse, line, layers) {
     super();
-    this.space = space;
     this.mouse = mouse;
     this.line = line;
     this.layers = layers;
@@ -2373,49 +3383,68 @@ function above_line(point, line) {
   let y = point[1];
   return a * x + b * y + c >= 0;
 }
-function reflect(point, line) {
-  let a = line[0];
-  let b = line[1];
-  let c = line[2];
-  let x = point[0];
-  let y = point[1];
-  let k = divideFloat(2 * (a * x + b * y + c), a * a + b * b);
-  return [x - a * k, y - b * k];
-}
-function split2(layer, fold_line, allow_partial) {
-  let combine_lines = (fold1, fold22) => {
-    if (fold1 instanceof Some) {
-      if (fold22 instanceof Some) {
-        let fold1$1 = fold1[0];
-        let fold2$1 = fold22[0];
-        let eval$ = (p) => {
-          return fold_line[1] * p[0] - fold_line[0] * p[1] + fold_line[2];
-        };
+function split3(layer, fold_line) {
+  let combine_lines = (crease1, crease2) => {
+    let eval$ = (p) => {
+      return fold_line[1] * p[0] - fold_line[0] * p[1] + fold_line[2];
+    };
+    let _block;
+    if (crease1 instanceof Some) {
+      let p1 = crease1[0][0];
+      let p2 = crease1[0][1];
+      let $ = eval$(p1) < eval$(p2);
+      if ($) {
+        _block = new Some([p1, p2]);
+      } else {
+        _block = new Some([p2, p1]);
+      }
+    } else {
+      _block = crease1;
+    }
+    let crease1$1 = _block;
+    let _block$1;
+    if (crease2 instanceof Some) {
+      let p1 = crease2[0][0];
+      let p2 = crease2[0][1];
+      let $ = eval$(p1) < eval$(p2);
+      if ($) {
+        _block$1 = new Some([p1, p2]);
+      } else {
+        _block$1 = new Some([p2, p1]);
+      }
+    } else {
+      _block$1 = crease2;
+    }
+    let crease2$1 = _block$1;
+    if (crease1$1 instanceof Some) {
+      if (crease2$1 instanceof Some) {
+        let crease1$2 = crease1$1[0];
+        let crease2$2 = crease2$1[0];
         return new Some([
           (() => {
-            let $ = eval$(fold1$1[0]) < eval$(fold2$1[0]);
+            let $ = eval$(crease1$2[0]) < eval$(crease2$2[0]);
             if ($) {
-              return fold1$1[0];
+              return crease1$2[0];
             } else {
-              return fold2$1[0];
+              return crease2$2[0];
             }
           })(),
           (() => {
-            let $ = eval$(fold1$1[1]) > eval$(fold2$1[1]);
+            let $ = eval$(crease1$2[1]) > eval$(crease2$2[1]);
             if ($) {
-              return fold1$1[1];
+              return crease1$2[1];
             } else {
-              return fold2$1[1];
+              return crease2$2[1];
             }
           })()
         ]);
       } else {
-        return fold1;
+        return crease1$1;
       }
-    } else if (fold22 instanceof Some) {
-      return fold22;
+    } else if (crease2$1 instanceof Some) {
+      return crease2$1;
     } else {
-      return fold1;
+      return crease1$1;
     }
   };
   if (layer instanceof Layer) {
@@ -2469,13 +3498,13 @@ function split2(layer, fold_line, allow_partial) {
     }
     let polys$2 = _block$1;
     if (polys$2 instanceof Empty) {
-      throw makeError("panic", FILEPATH4, "folding", 129, "split", "`panic` expression evaluated.", {});
+      throw makeError("panic", FILEPATH5, "folding", 138, "split", "`panic` expression evaluated.", {});
     } else {
       let $ = polys$2.tail;
       if ($ instanceof Empty) {
         let $1 = polys$2.head;
         if ($1 instanceof Empty) {
-          throw makeError("panic", FILEPATH4, "folding", 129, "split", "`panic` expression evaluated.", {});
+          throw makeError("panic", FILEPATH5, "folding", 138, "split", "`panic` expression evaluated.", {});
         } else {
           let p1 = $1.head;
           let $2 = above_line(p1, fold_line);
@@ -2491,16 +3520,16 @@ function split2(layer, fold_line, allow_partial) {
           let a = polys$2.head;
           let b = $.head;
           let a1 = lazy_unwrap(first(a), () => {
-            throw makeError("panic", FILEPATH4, "folding", 105, "split", "`panic` expression evaluated.", {});
+            throw makeError("panic", FILEPATH5, "folding", 114, "split", "`panic` expression evaluated.", {});
           });
           let a2 = lazy_unwrap(last(a), () => {
-            throw makeError("panic", FILEPATH4, "folding", 106, "split", "`panic` expression evaluated.", {});
+            throw makeError("panic", FILEPATH5, "folding", 115, "split", "`panic` expression evaluated.", {});
           });
           let b1 = lazy_unwrap(first(b), () => {
-            throw makeError("panic", FILEPATH4, "folding", 107, "split", "`panic` expression evaluated.", {});
+            throw makeError("panic", FILEPATH5, "folding", 116, "split", "`panic` expression evaluated.", {});
           });
           let b2 = lazy_unwrap(last(b), () => {
-            throw makeError("panic", FILEPATH4, "folding", 108, "split", "`panic` expression evaluated.", {});
+            throw makeError("panic", FILEPATH5, "folding", 117, "split", "`panic` expression evaluated.", {});
           });
           let p1 = line_intersection(points2line(a1, b2), fold_line);
           let p2 = line_intersection(points2line(a2, b1), fold_line);
@@ -2510,17 +3539,17 @@ function split2(layer, fold_line, allow_partial) {
             new Some([p1, p2])
           ];
         } else {
-          throw makeError("panic", FILEPATH4, "folding", 129, "split", "`panic` expression evaluated.", {});
+          throw makeError("panic", FILEPATH5, "folding", 138, "split", "`panic` expression evaluated.", {});
         }
       }
     }
   } else if (layer instanceof Stack) {
     let layers = layer[0];
-    let $ = fold2(layers, [List$Empty$const, List$Empty$const, Option$None$const], (state, layer2) => {
+    let $ = fold_right(layers, [List$Empty$const, List$Empty$const, Option$None$const], (state, layer2) => {
       let ltop = state[0];
       let lbottom = state[1];
       let fold$12 = state[2];
-      let $1 = split2(layer2, fold_line, allow_partial);
+      let $1 = split3(layer2, fold_line);
       let top2 = $1[0];
       let bottom2 = $1[1];
       let fold1 = $1[2];
@@ -2537,7 +3566,7 @@ function split2(layer, fold_line, allow_partial) {
           return Option$None$const;
         } else {
           let layers$1 = top;
-          return new Some(new Stack(reverse2(layers$1)));
+          return new Some(new Stack(layers$1));
         }
       })(),
       (() => {
@@ -2545,7 +3574,7 @@ function split2(layer, fold_line, allow_partial) {
           return Option$None$const;
         } else {
           let layers$1 = bottom;
-          return new Some(new Stack(reverse2(layers$1)));
+          return new Some(new Stack(layers$1));
         }
       })(),
       fold$1
@@ -2553,277 +3582,301 @@ function split2(layer, fold_line, allow_partial) {
   } else {
     let top = layer.top;
     let bottom = layer.bottom;
-    let current_fold = layer.fold;
+    let crease = layer.crease;
     let _block;
-    let $ = above_line(current_fold[0], fold_line);
-    if ($) {
-      _block = current_fold;
-    } else {
-      _block = [current_fold[1], current_fold[0]];
-    }
-    let current_fold$1 = _block;
-    let _block$1;
     {
-      let $22 = split2(top, fold_line, allow_partial);
-      let top$1 = $22[0];
-      let bottom$1 = $22[1];
-      let new_fold2 = $22[2];
-      _block$1 = [
-        values(toList([top$1])),
-        values(toList([bottom$1])),
-        new_fold2
+      let $12 = split3(top, fold_line);
+      let top1 = $12[0];
+      let bottom1 = $12[1];
+      let crease12 = $12[2];
+      let $22 = split3(bottom, fold_line);
+      let top2 = $22[0];
+      let bottom2 = $22[1];
+      let crease22 = $22[2];
+      _block = [
+        values(toList([top1, top2])),
+        values(toList([bottom1, bottom2])),
+        combine_lines(crease12, crease22)
       ];
+    }
+    let $ = _block;
+    let top$1 = $[0];
+    let bottom$1 = $[1];
+    let new_crease = $[2];
+    let intersection2 = line_intersection(points2line(crease[0], crease[1]), fold_line);
+    let _block$1;
+    let $2 = above_line(crease[0], fold_line);
+    let $3 = above_line(crease[1], fold_line);
+    if ($2) {
+      if ($3) {
+        _block$1 = [crease, unwrap(new_crease, crease)];
+      } else {
+        _block$1 = [[crease[0], intersection2], [intersection2, crease[1]]];
+      }
+    } else if ($3) {
+      _block$1 = [[crease[1], intersection2], [intersection2, crease[0]]];
+    } else {
+      _block$1 = [unwrap(new_crease, crease), crease];
     }
     let $1 = _block$1;
-    let ltop = $1[0];
-    let lbottom = $1[1];
-    let new_fold = $1[2];
-    let partial_fold = !above_line(current_fold$1[0], fold_line) && !is_empty2(ltop) && allow_partial;
-    let _block$2;
-    if (partial_fold) {
-      _block$2 = [ltop, append(lbottom, toList([bottom])), new_fold];
-    } else {
-      let $32 = split2(bottom, fold_line, is_empty2(ltop) && allow_partial);
-      let top$1 = $32[0];
-      let bottom$1 = $32[1];
-      let new_fold2 = $32[2];
-      _block$2 = [
-        append(ltop, values(toList([top$1]))),
-        append(lbottom, values(toList([bottom$1]))),
-        combine_lines(new_fold, new_fold2)
-      ];
-    }
-    let $2 = _block$2;
-    let ltop$1 = $2[0];
-    let lbottom$1 = $2[1];
-    let new_fold$1 = $2[2];
-    let _block$3;
-    let $4 = above_line(current_fold$1[0], fold_line);
-    let $5 = above_line(current_fold$1[1], fold_line);
-    if ($4) {
-      if ($5) {
-        _block$3 = [current_fold$1, unwrap(new_fold$1, current_fold$1)];
+    let crease1 = $1[0];
+    let crease2 = $1[1];
+    let combine2 = (layers, crease3) => {
+      if (layers instanceof Empty) {
+        return Option$None$const;
       } else {
-        let intersection = line_intersection(points2line(current_fold$1[0], current_fold$1[1]), fold_line);
-        _block$3 = [
-          [current_fold$1[0], intersection],
-          [intersection, current_fold$1[1]]
-        ];
+        let $4 = layers.tail;
+        if ($4 instanceof Empty) {
+          let layer$1 = layers.head;
+          return new Some(layer$1);
+        } else {
+          let $5 = $4.tail;
+          if ($5 instanceof Empty) {
+            let top$2 = layers.head;
+            let bottom$2 = $4.head;
+            return new Some(new Fold(top$2, bottom$2, crease3));
+          } else {
+            throw makeError("panic", FILEPATH5, "folding", 199, "split", "`panic` expression evaluated.", {});
+          }
+        }
       }
-    } else if ($5) {
-      throw makeError("panic", FILEPATH4, "folding", 204, "split", "sorted", {});
-    } else {
-      _block$3 = [unwrap(new_fold$1, current_fold$1), current_fold$1];
-    }
-    let $3 = _block$3;
-    let fold_top = $3[0];
-    let fold_bottom = $3[1];
-    return [
-      (() => {
-        if (ltop$1 instanceof Empty) {
-          return Option$None$const;
-        } else {
-          let $6 = ltop$1.tail;
-          if ($6 instanceof Empty) {
-            let layer$1 = ltop$1.head;
-            return new Some(layer$1);
-          } else {
-            let $7 = $6.tail;
-            if ($7 instanceof Empty) {
-              let top$1 = ltop$1.head;
-              let bottom$1 = $6.head;
-              return new Some(new Fold(top$1, bottom$1, fold_top));
-            } else {
-              throw makeError("panic", FILEPATH4, "folding", 213, "split", "`panic` expression evaluated.", {});
-            }
-          }
-        }
-      })(),
-      (() => {
-        if (lbottom$1 instanceof Empty) {
-          return Option$None$const;
-        } else {
-          let $6 = lbottom$1.tail;
-          if ($6 instanceof Empty) {
-            let layer$1 = lbottom$1.head;
-            return new Some(layer$1);
-          } else {
-            let $7 = $6.tail;
-            if ($7 instanceof Empty) {
-              let top$1 = lbottom$1.head;
-              let bottom$1 = $6.head;
-              return new Some(new Fold(top$1, bottom$1, fold_bottom));
-            } else {
-              throw makeError("panic", FILEPATH4, "folding", 219, "split", "`panic` expression evaluated.", {});
-            }
-          }
-        }
-      })(),
-      new_fold$1
-    ];
+    };
+    return [combine2(top$1, crease1), combine2(bottom$1, crease2), new_crease];
   }
 }
-function flip(layer, flip_line) {
-  if (layer instanceof Layer) {
-    let points = layer.points;
-    return new Layer(map2(points, (_capture) => {
-      return reflect(_capture, flip_line);
-    }), layer.animation, layer.color);
-  } else if (layer instanceof Stack) {
-    let layers = layer[0];
-    return new Stack(reverse2(map2(layers, (_capture) => {
-      return flip(_capture, flip_line);
-    })));
-  } else {
+function fold4(layer, fold_line, callback) {
+  let split_fold = (layer2) => {
+    let $ = split3(layer2, fold_line);
+    let top = $[0];
+    let bottom = $[1];
+    let crease = $[2];
+    if (top instanceof Some) {
+      if (bottom instanceof Some) {
+        if (crease instanceof Some) {
+          let top$1 = top[0];
+          let bottom$1 = bottom[0];
+          let crease$1 = crease[0];
+          return [
+            callback(new Fold(flip(top$1, fold_line), bottom$1, crease$1)),
+            true
+          ];
+        } else {
+          return [layer2, false];
+        }
+      } else {
+        let top$1 = top[0];
+        return [flip(top$1, fold_line), true];
+      }
+    } else if (bottom instanceof Some) {
+      let bottom$1 = bottom[0];
+      return [bottom$1, false];
+    } else {
+      return [layer2, false];
+    }
+  };
+  if (layer instanceof Fold) {
     let top = layer.top;
     let bottom = layer.bottom;
-    let p1 = layer.fold[0];
-    let p2 = layer.fold[1];
-    return new Fold(flip(bottom, flip_line), flip(top, flip_line), [reflect(p1, flip_line), reflect(p2, flip_line)]);
-  }
-}
-function fold3(layer, fold_line) {
-  let $ = split2(layer, fold_line, true);
-  let $1 = $[0];
-  if ($1 instanceof Some) {
-    let $2 = $[1];
-    if ($2 instanceof Some) {
-      let $3 = $[2];
-      if ($3 instanceof Some) {
-        let top = $1[0];
-        let bottom = $2[0];
-        let flip1 = $3[0];
-        return new Fold(flip(top, fold_line), bottom, flip1);
-      } else {
-        throw makeError("panic", FILEPATH4, "folding", 246, "fold", "`panic` expression evaluated.", {});
-      }
+    let crease = layer.crease;
+    let fold_all = above_line(crease[0], fold_line) || above_line(crease[1], fold_line);
+    if (fold_all) {
+      return split_fold(layer);
     } else {
-      let top = $1[0];
-      return flip(top, fold_line);
+      let $ = fold4(top, fold_line, callback);
+      let $1 = $[1];
+      if ($1) {
+        let top$1 = $[0];
+        return [new Fold(top$1, bottom, crease), true];
+      } else {
+        let top$1 = $[0];
+        let $2 = fold4(bottom, fold_line, (layer2) => {
+          if (layer2 instanceof Fold) {
+            let top1 = layer2.top;
+            let bottom1 = layer2.bottom;
+            let crease1 = layer2.crease;
+            return callback(new Fold(top1, new Fold(top$1, bottom1, crease), crease1));
+          } else {
+            return layer2;
+          }
+        });
+        let $3 = $2[1];
+        if ($3) {
+          return $2;
+        } else {
+          return [layer, false];
+        }
+      }
     }
   } else {
-    let $2 = $[1];
-    if ($2 instanceof Some) {
-      let bottom = $2[0];
-      return bottom;
-    } else {
-      throw makeError("panic", FILEPATH4, "folding", 246, "fold", "`panic` expression evaluated.", {});
-    }
+    let layer$1 = layer;
+    return split_fold(layer$1);
   }
+}
+function continuous_time() {
+  return identity(time()) / 1000;
+}
+function randomize(layer) {
+  let top_layer = topmost(layer);
+  let _block;
+  if (top_layer instanceof Layer) {
+    let points2 = top_layer.points;
+    _block = points2;
+  } else {
+    throw makeError("panic", FILEPATH5, "folding", 275, "randomize", "`panic` expression evaluated.", {});
+  }
+  let points = _block;
+  return ((callback) => {
+    return unwrap2(find_map((() => {
+      let _pipe = points;
+      return shuffle(_pipe);
+    })(), callback), layer);
+  })((point) => {
+    let dirs = toList([[1, 0], [1, 1], [0, 1], [-1, 1]]);
+    return find_map(dirs, (dir) => {
+      let line = points2line(point, [point[0] + dir[0], point[1] + dir[1]]);
+      let $ = split3(top_layer, line);
+      let $1 = $[0];
+      if ($1 instanceof Some) {
+        let $2 = $[1];
+        if ($2 instanceof Some) {
+          let l1 = $1[0];
+          let l2 = $2[0];
+          let $3 = min2(echo(area(l1), undefined, "src/folding.gleam", 294), echo(area(l2), undefined, "src/folding.gleam", 294)) > 5;
+          if ($3) {
+            return new Ok(fold4(layer, line, (layer2) => {
+              return layer2;
+            })[0]);
+          } else {
+            return new Error(undefined);
+          }
+        } else {
+          return new Error(undefined);
+        }
+      } else {
+        return new Error(undefined);
+      }
+    });
+  });
 }
 function init() {
-  return new Paper(false, [0, 0], Option$None$const, new Stack(toList([
-    new Layer(toList([
-      [-150, -250],
-      [150, -250],
-      [150, 250],
-      [-150, 250]
-    ]), repeat([0, 0], 4), colour_hex("#F1E9D2")),
-    new Layer(toList([
-      [-100, -200],
-      [100, -200],
-      [100, 200],
-      [-100, 200]
-    ]), repeat([0, 0], 4), colour_hex("#1111ff"))
-  ])));
-}
-function update_animation(layer) {
-  if (layer instanceof Layer) {
-    let points = layer.points;
-    let animation = layer.animation;
-    return new Layer(points, map2(zip(points, animation), (e) => {
-      let target = e[0];
-      let p = e[1];
-      return [
-        p[0] + (target[0] - p[0]) * 0.1,
-        p[1] + (target[1] - p[1]) * 0.1
-      ];
-    }), layer.color);
-  } else if (layer instanceof Stack) {
-    let layers = layer[0];
-    return new Stack(map2(layers, update_animation));
-  } else {
-    let top = layer.top;
-    let bottom = layer.bottom;
-    return new Fold(update_animation(top), update_animation(bottom), layer.fold);
-  }
+  return new Paper([0, 0], Option$None$const, toList([default_stack(1)]));
 }
 function update(state, event) {
-  if (event instanceof Tick) {
-    return new Paper(state.space, state.mouse, state.line, update_animation(state.layers));
-  } else if (event instanceof KeyboardPressed) {
-    let $ = event[0];
-    if ($ instanceof KeySpace) {
-      return new Paper(true, state.mouse, state.line, state.layers);
-    } else {
-      return state;
-    }
-  } else if (event instanceof KeyboardRelased) {
-    let $ = event[0];
-    if ($ instanceof KeySpace) {
-      return new Paper(false, state.mouse, state.line, state.layers);
-    } else {
-      return state;
-    }
-  } else if (event instanceof MouseMoved) {
-    let x = event[0];
-    let y = event[1];
-    return new Paper(state.space, [x - width() / 2, y - height() / 2], state.line, state.layers);
-  } else if (event instanceof MousePressed) {
-    let $ = event[0];
-    if ($ instanceof MouseButtonLeft) {
-      return new Paper(state.space, state.mouse, new Some(state.mouse), state.layers);
-    } else {
-      return state;
-    }
-  } else {
-    let $ = event[0];
-    if ($ instanceof MouseButtonLeft) {
-      let $1 = state.line;
-      if ($1 instanceof Some) {
-        let mouse = state.mouse;
-        let layers = state.layers;
-        let start = $1[0];
-        let fold_line = points2line(start, mouse);
-        return new Paper(state.space, state.mouse, Option$None$const, fold3(layers, fold_line));
+  let $ = state.layers;
+  if ($ instanceof Empty) {
+    if (event instanceof MouseMoved) {
+      let x = event[0];
+      let y = event[1];
+      return new Paper([x - width() / 2, y - height() / 2], state.line, state.layers);
+    } else if (event instanceof MousePressed) {
+      let $1 = event[0];
+      if ($1 instanceof MouseButtonLeft) {
+        return new Paper(state.mouse, new Some(state.mouse), state.layers);
       } else {
         return state;
       }
     } else {
       return state;
     }
-  }
-}
-function draw_layer(layer) {
-  if (layer instanceof Layer) {
-    let $ = layer.animation;
-    if ($ instanceof Empty) {
-      return blank();
-    } else {
-      let $1 = $.tail;
-      if ($1 instanceof Empty) {
-        return blank();
-      } else {
-        let color = layer.color;
-        let p1 = $.head;
-        let p2 = $1.head;
-        let rest = $1.tail;
-        let _pipe = path(p1, flatten(toList([
-          toList([path_line(p2)]),
-          map2(rest, path_line),
-          toList([path_line(p1), path_line(p2)])
-        ])));
-        let _pipe$1 = stroke(_pipe, black, 3);
-        return fill(_pipe$1, color);
-      }
-    }
-  } else if (layer instanceof Stack) {
-    let layers = layer[0];
-    return combine(map2(layers, draw_layer));
   } else {
-    let top = layer.top;
-    let bottom = layer.bottom;
-    return concat2(draw_layer(bottom), draw_layer(top));
+    let $1 = $.tail;
+    if ($1 instanceof Empty) {
+      if (event instanceof Tick) {
+        let layer = $.head;
+        let rest = $1;
+        return new Paper(state.mouse, state.line, prepend(update_animation(layer), rest));
+      } else if (event instanceof KeyboardPressed) {
+        let $2 = event[0];
+        if ($2 instanceof KeySpace) {
+          let layer = $.head;
+          let rest = $1;
+          return new Paper(state.mouse, state.line, prepend(align(center(layer), 4), rest));
+        } else {
+          return state;
+        }
+      } else if (event instanceof MouseMoved) {
+        let x = event[0];
+        let y = event[1];
+        return new Paper([x - width() / 2, y - height() / 2], state.line, state.layers);
+      } else if (event instanceof MousePressed) {
+        let $2 = event[0];
+        if ($2 instanceof MouseButtonLeft) {
+          return new Paper(state.mouse, new Some(state.mouse), state.layers);
+        } else {
+          return state;
+        }
+      } else if (event instanceof MouseReleased) {
+        let $2 = state.line;
+        if ($2 instanceof Some) {
+          let $3 = event[0];
+          if ($3 instanceof MouseButtonLeft) {
+            let mouse = state.mouse;
+            let layer = $.head;
+            let rest = $1;
+            let start = $2[0];
+            let fold_line = points2line(start, mouse);
+            return new Paper(state.mouse, Option$None$const, prepend(fold4(layer, fold_line, (layer2) => {
+              return layer2;
+            })[0], prepend(layer, rest)));
+          } else {
+            return state;
+          }
+        } else {
+          return state;
+        }
+      } else {
+        return state;
+      }
+    } else if (event instanceof Tick) {
+      let layer = $.head;
+      let rest = $1;
+      return new Paper(state.mouse, state.line, prepend(update_animation(layer), rest));
+    } else if (event instanceof KeyboardPressed) {
+      let $2 = event[0];
+      if ($2 instanceof KeySpace) {
+        let layer = $.head;
+        let rest = $1;
+        return new Paper(state.mouse, state.line, prepend(align(center(layer), 4), rest));
+      } else if ($2 instanceof KeyBackspace) {
+        let previous = $1.head;
+        let rest = $1.tail;
+        return new Paper(state.mouse, state.line, prepend(previous, rest));
+      } else {
+        return state;
+      }
+    } else if (event instanceof MouseMoved) {
+      let x = event[0];
+      let y = event[1];
+      return new Paper([x - width() / 2, y - height() / 2], state.line, state.layers);
+    } else if (event instanceof MousePressed) {
+      let $2 = event[0];
+      if ($2 instanceof MouseButtonLeft) {
+        return new Paper(state.mouse, new Some(state.mouse), state.layers);
+      } else {
+        return state;
+      }
+    } else if (event instanceof MouseReleased) {
+      let $2 = state.line;
+      if ($2 instanceof Some) {
+        let $3 = event[0];
+        if ($3 instanceof MouseButtonLeft) {
+          let mouse = state.mouse;
+          let layer = $.head;
+          let rest = $1;
+          let start = $2[0];
+          let fold_line = points2line(start, mouse);
+          return new Paper(state.mouse, Option$None$const, prepend(fold4(layer, fold_line, (layer2) => {
+            return layer2;
+          })[0], prepend(layer, rest)));
+        } else {
+          return state;
+        }
+      } else {
+        return state;
+      }
+    } else {
+      return state;
+    }
   }
 }
 function view(state) {
@@ -2837,25 +3890,360 @@ function view(state) {
     _block = blank();
   }
   let line = _block;
-  let _pipe = combine(toList([draw_layer(state.layers), line]));
+  let _pipe = combine(toList([
+    (() => {
+      let $1 = state.layers;
+      if ($1 instanceof Empty) {
+        return blank();
+      } else {
+        let layer = $1.head;
+        return draw_layer(layer);
+      }
+    })(),
+    line
+  ]));
   return translate_xy(_pipe, width() / 2, height() / 2);
+}
+function echo(value, message, file, line) {
+  const grey = "\x1B[90m";
+  const reset_color = "\x1B[39m";
+  const file_line = `${file}:${line}`;
+  const inspector = new Echo$Inspector;
+  const string_value = inspector.inspect(value);
+  const string_message = message === undefined ? "" : " " + message;
+  if (globalThis.process?.stderr?.write) {
+    const string4 = `${grey}${file_line}${reset_color}${string_message}
+${string_value}
+`;
+    globalThis.process.stderr.write(string4);
+  } else if (globalThis.Deno) {
+    const string4 = `${grey}${file_line}${reset_color}${string_message}
+${string_value}
+`;
+    globalThis.Deno.stderr.writeSync(new TextEncoder().encode(string4));
+  } else {
+    const string4 = `${file_line}${string_message}
+${string_value}`;
+    globalThis.console.log(string4);
+  }
+  return value;
+}
+
+class Echo$Inspector {
+  #references = new globalThis.Set;
+  #isDict(value) {
+    try {
+      const empty_dict = make();
+      const dict_class = empty_dict.constructor;
+      return value instanceof dict_class;
+    } catch {
+      return false;
+    }
+  }
+  #float(float4) {
+    const string4 = float4.toString().replace("+", "");
+    if (string4.indexOf(".") >= 0) {
+      return string4;
+    } else {
+      const index3 = string4.indexOf("e");
+      if (index3 >= 0) {
+        return string4.slice(0, index3) + ".0" + string4.slice(index3);
+      } else {
+        return string4 + ".0";
+      }
+    }
+  }
+  inspect(v) {
+    const t = typeof v;
+    if (v === true)
+      return "True";
+    if (v === false)
+      return "False";
+    if (v === null)
+      return "//js(null)";
+    if (v === undefined)
+      return "Nil";
+    if (t === "string")
+      return this.#string(v);
+    if (t === "bigint" || globalThis.Number.isInteger(v))
+      return v.toString();
+    if (t === "number")
+      return this.#float(v);
+    if (v instanceof UtfCodepoint)
+      return this.#utfCodepoint(v);
+    if (v instanceof BitArray)
+      return this.#bit_array(v);
+    if (v instanceof globalThis.RegExp)
+      return `//js(${v})`;
+    if (v instanceof globalThis.Date)
+      return `//js(Date("${v.toISOString()}"))`;
+    if (v instanceof globalThis.Error)
+      return `//js(${v.toString()})`;
+    if (v instanceof globalThis.Function) {
+      const args = [];
+      for (const i of globalThis.Array(v.length).keys())
+        args.push(globalThis.String.fromCharCode(i + 97));
+      return `//fn(${args.join(", ")}) { ... }`;
+    }
+    if (this.#references.size === this.#references.add(v).size) {
+      return "//js(circular reference)";
+    }
+    let printed;
+    if (globalThis.Array.isArray(v)) {
+      printed = `#(${v.map((v2) => this.inspect(v2)).join(", ")})`;
+    } else if (v instanceof List) {
+      printed = this.#list(v);
+    } else if (v instanceof CustomType) {
+      printed = this.#customType(v);
+    } else if (this.#isDict(v)) {
+      printed = this.#dict(v);
+    } else if (v instanceof Set) {
+      return `//js(Set(${[...v].map((v2) => this.inspect(v2)).join(", ")}))`;
+    } else {
+      printed = this.#object(v);
+    }
+    this.#references.delete(v);
+    return printed;
+  }
+  #object(v) {
+    const name = globalThis.Object.getPrototypeOf(v)?.constructor?.name || "Object";
+    const props = [];
+    for (const k of globalThis.Object.keys(v)) {
+      props.push(`${this.inspect(k)}: ${this.inspect(v[k])}`);
+    }
+    const body = props.length ? " " + props.join(", ") + " " : "";
+    const head = name === "Object" ? "" : name + " ";
+    return `//js(${head}{${body}})`;
+  }
+  #dict(map6) {
+    let body = "dict.from_list([";
+    let first2 = true;
+    let key_value_pairs = fold(map6, [], (pairs, key, value) => {
+      pairs.push([key, value]);
+      return pairs;
+    });
+    key_value_pairs.sort();
+    key_value_pairs.forEach(([key, value]) => {
+      if (!first2)
+        body = body + ", ";
+      body = body + "#(" + this.inspect(key) + ", " + this.inspect(value) + ")";
+      first2 = false;
+    });
+    return body + "])";
+  }
+  #customType(record) {
+    const props = globalThis.Object.keys(record).map((label) => {
+      const value = this.inspect(record[label]);
+      return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+    }).join(", ");
+    return props ? `${record.constructor.name}(${props})` : record.constructor.name;
+  }
+  #list(list3) {
+    if (list3 instanceof Empty) {
+      return "[]";
+    }
+    let char_out = 'charlist.from_string("';
+    let list_out = "[";
+    let current = list3;
+    while (current instanceof NonEmpty) {
+      let element = current.head;
+      current = current.tail;
+      if (list_out !== "[") {
+        list_out += ", ";
+      }
+      list_out += this.inspect(element);
+      if (char_out) {
+        if (globalThis.Number.isInteger(element) && element >= 32 && element <= 126) {
+          char_out += globalThis.String.fromCharCode(element);
+        } else {
+          char_out = null;
+        }
+      }
+    }
+    if (char_out) {
+      return char_out + '")';
+    } else {
+      return list_out + "]";
+    }
+  }
+  #string(str) {
+    let new_str = '"';
+    for (let i = 0;i < str.length; i++) {
+      const char = str[i];
+      switch (char) {
+        case `
+`:
+          new_str += "\\n";
+          break;
+        case "\r":
+          new_str += "\\r";
+          break;
+        case "\t":
+          new_str += "\\t";
+          break;
+        case "\f":
+          new_str += "\\f";
+          break;
+        case "\\":
+          new_str += "\\\\";
+          break;
+        case '"':
+          new_str += "\\\"";
+          break;
+        default:
+          if (char < " " || char > "~" && char < " ") {
+            new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
+          } else {
+            new_str += char;
+          }
+      }
+    }
+    new_str += '"';
+    return new_str;
+  }
+  #utfCodepoint(codepoint2) {
+    return `//utfcodepoint(${globalThis.String.fromCodePoint(codepoint2.value)})`;
+  }
+  #bit_array(bits2) {
+    if (bits2.bitSize === 0) {
+      return "<<>>";
+    }
+    let acc = "<<";
+    for (let i = 0;i < bits2.byteSize - 1; i++) {
+      acc += bits2.byteAt(i).toString();
+      acc += ", ";
+    }
+    if (bits2.byteSize * 8 === bits2.bitSize) {
+      acc += bits2.byteAt(bits2.byteSize - 1).toString();
+    } else {
+      const trailingBitsCount = bits2.bitSize % 8;
+      acc += bits2.byteAt(bits2.byteSize - 1) >> 8 - trailingBitsCount;
+      acc += `:size(${trailingBitsCount})`;
+    }
+    acc += ">>";
+    return acc;
+  }
 }
 
 // build/dev/javascript/paper/paper.mjs
 class State extends CustomType {
-  constructor(paper) {
+  constructor(paper2, tasks, score, animated_score, reset_timer) {
     super();
-    this.paper = paper;
+    this.paper = paper2;
+    this.tasks = tasks;
+    this.score = score;
+    this.animated_score = animated_score;
+    this.reset_timer = reset_timer;
   }
 }
 function init2(_) {
-  return new State(init());
+  return new State(init(), List$Empty$const, 0, 0, Option$None$const);
 }
 function update2(state, event) {
-  return new State(update(state.paper, event));
+  let paper2 = state.paper;
+  let tasks = state.tasks;
+  let score = state.score;
+  let animated_score = state.animated_score;
+  let reset_timer = state.reset_timer;
+  let tasks$1 = index_map(tasks, (task, index3) => {
+    let task$1 = task[0];
+    let y = task[1];
+    let reset3 = task[2];
+    return [
+      update_animation(task$1),
+      y + (identity(index3) - y) * 0.1,
+      reset3
+    ];
+  });
+  let paper$1 = update(paper2, event);
+  let animated_score$1 = animated_score + (score - animated_score) * 0.1;
+  let _block;
+  let $ = is_empty2(tasks$1);
+  if ($) {
+    let iterations = min(round(floor(score / 500)) + 1, 4);
+    let batch = reverse2(scan(repeat(0, iterations), default_stack(0.25), (layer, _) => {
+      return center(randomize(layer));
+    }));
+    _block = append(index_map(batch, (layer, index3) => {
+      return [layer, 0, index3 === 0];
+    }), tasks$1);
+  } else {
+    _block = tasks$1;
+  }
+  let tasks$2 = _block;
+  let ntasks = length(tasks$2);
+  let _block$1;
+  let $2 = paper$1.layers;
+  if ($2 instanceof Empty) {
+    _block$1 = [tasks$2, score, false];
+  } else if (event instanceof MouseReleased) {
+    let $32 = event[0];
+    if ($32 instanceof MouseButtonLeft) {
+      let layer = $2.head;
+      let layer$1 = align(center(layer), 1);
+      _block$1 = fold_right(tasks$2, [List$Empty$const, score, true], (state2, task) => {
+        let tasks$32 = state2[0];
+        let score$12 = state2[1];
+        let reset3 = state2[2];
+        let $4 = match(layer$1, align(task[0], 1), 0.25);
+        if ($4 instanceof Some) {
+          let accuracy = $4[0];
+          return [tasks$32, score$12 + accuracy * 100, reset3 && task[2]];
+        } else {
+          return [prepend(task, tasks$32), score$12, reset3];
+        }
+      });
+    } else {
+      _block$1 = [tasks$2, score, false];
+    }
+  } else {
+    _block$1 = [tasks$2, score, false];
+  }
+  let $1 = _block$1;
+  let tasks$3 = $1[0];
+  let score$1 = $1[1];
+  let reset2 = $1[2];
+  let reset$1 = length(tasks$3) !== ntasks && reset2;
+  let time2 = continuous_time();
+  let _block$2;
+  if (reset$1) {
+    _block$2 = new Some(time2 + 0.3);
+  } else {
+    _block$2 = reset_timer;
+  }
+  let reset_timer$1 = _block$2;
+  let _block$3;
+  if (reset_timer$1 instanceof Some) {
+    let reset_timer$22 = reset_timer$1[0];
+    if (time2 > reset_timer$22) {
+      _block$3 = [
+        new Paper(paper$1.mouse, paper$1.line, toList([default_stack(1)])),
+        Option$None$const
+      ];
+    } else {
+      _block$3 = [paper$1, reset_timer$1];
+    }
+  } else {
+    _block$3 = [paper$1, reset_timer$1];
+  }
+  let $3 = _block$3;
+  let paper$2 = $3[0];
+  let reset_timer$2 = $3[1];
+  return new State(paper$2, tasks$3, score$1, animated_score$1, reset_timer$2);
 }
 function view2(state) {
-  return view(state.paper);
+  return combine(prepend(view(state.paper), prepend((() => {
+    let _pipe = text(to_string(round(state.animated_score)), 80);
+    let _pipe$1 = text_align(_pipe, TextAlign$TextAlignCenter$const2);
+    let _pipe$2 = text_baseline(_pipe$1, TextBaseline$TextBaselineTop$const2);
+    let _pipe$3 = translate_xy(_pipe$2, width() / 2, 10);
+    return fill(_pipe$3, colour_hex("#AAAAAA"));
+  })(), map3(state.tasks, (task) => {
+    let layer = task[0];
+    let index3 = task[1];
+    let _pipe = draw_layer(layer);
+    return translate_xy(_pipe, width() - 100, 150 * index3 + 75);
+  }))));
 }
 function main() {
   return interact(init2, update2, view2, "#mycanvas");
