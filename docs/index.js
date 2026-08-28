@@ -601,14 +601,6 @@ class Node {
     return hash;
   }
 }
-var emptyNode = /* @__PURE__ */ newNode(0);
-var emptyDict = /* @__PURE__ */ new Dict(0, emptyNode);
-function newNode(generation) {
-  return new Node(generation, 0, 0, []);
-}
-function make() {
-  return emptyDict;
-}
 function fold(dict, state, fun) {
   const queue = [dict.root];
   while (queue.length) {
@@ -700,6 +692,30 @@ function map_loop(loop$list, loop$fun, loop$acc) {
 }
 function map3(list, fun) {
   return map_loop(list, fun, List$Empty$const);
+}
+function map_fold_loop(loop$list, loop$fun, loop$acc, loop$list_acc) {
+  while (true) {
+    let list = loop$list;
+    let fun = loop$fun;
+    let acc = loop$acc;
+    let list_acc = loop$list_acc;
+    if (list instanceof Empty) {
+      return [acc, reverse2(list_acc)];
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      let $ = fun(acc, first$1);
+      let acc$1 = $[0];
+      let first$2 = $[1];
+      loop$list = rest$1;
+      loop$fun = fun;
+      loop$acc = acc$1;
+      loop$list_acc = prepend(first$2, list_acc);
+    }
+  }
+}
+function map_fold(list, initial, fun) {
+  return map_fold_loop(list, fun, initial, List$Empty$const);
 }
 function index_map_loop(loop$list, loop$fun, loop$index, loop$acc) {
   while (true) {
@@ -1767,6 +1783,14 @@ function multiply(a, b) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
+function map4(result, fun) {
+  if (result instanceof Ok) {
+    let x = result[0];
+    return new Ok(fun(x));
+  } else {
+    return result;
+  }
+}
 function try$(result, fun) {
   if (result instanceof Ok) {
     let x = result[0];
@@ -1807,7 +1831,6 @@ class Rgba extends CustomType {
     this.a = a;
   }
 }
-var black = /* @__PURE__ */ new Rgba(0, 0, 0, 1);
 var dark_grey = /* @__PURE__ */ new Rgba(0.7294117647058823, 0.7411764705882353, 0.7137254901960784, 1);
 function valid_colour_value(c) {
   let $ = c > 1 || c < 0;
@@ -2388,7 +2411,7 @@ class KeyboardPressed extends CustomType {
     this[0] = $0;
   }
 }
-class KeyboardRelased extends CustomType {
+class KeyboardReleased extends CustomType {
   constructor($0) {
     super();
     this[0] = $0;
@@ -2458,6 +2481,9 @@ var Key$KeyEscape$const = new KeyEscape;
 class KeyBackspace extends CustomType {
 }
 var Key$KeyBackspace$const = new KeyBackspace;
+class KeyShift extends CustomType {
+}
+var Key$KeyShift$const = new KeyShift;
 class MouseButtonLeft extends CustomType {
 }
 var MouseButton$MouseButtonLeft$const = new MouseButtonLeft;
@@ -2810,12 +2836,12 @@ function get_tick_func(ctx, view, update, selector) {
     if ($ instanceof Ok) {
       current_state = $[0];
     } else {
-      throw makeError("let_assert", FILEPATH3, "paint/canvas", 476, "get_tick_func", "Pattern match failed, no pattern matched the value.", {
+      throw makeError("let_assert", FILEPATH3, "paint/canvas", 477, "get_tick_func", "Pattern match failed, no pattern matched the value.", {
         value: $,
-        start: 13594,
-        end: 13657,
-        pattern_start: 13605,
-        pattern_end: 13622
+        start: 13626,
+        end: 13689,
+        pattern_start: 13637,
+        pattern_end: 13654
       });
     }
     let new_state = update(current_state, new Tick(time));
@@ -2857,6 +2883,8 @@ function parse_key_code(key_code) {
     return new Some(Key$KeyEscape$const);
   } else if (key_code === 8) {
     return new Some(Key$KeyBackspace$const);
+  } else if (key_code === 16) {
+    return new Some(Key$KeyShift$const);
   } else {
     return Option$None$const;
   }
@@ -2894,7 +2922,7 @@ function interact(init, update, view, selector) {
     return new KeyboardPressed(var0);
   });
   create_key_handler("keyup", (var0) => {
-    return new KeyboardRelased(var0);
+    return new KeyboardReleased(var0);
   });
   setup_input_handler("mousemove", (event) => {
     let $ = mouse_pos(ctx, event);
@@ -2907,10 +2935,10 @@ function interact(init, update, view, selector) {
     } else {
       throw makeError("let_assert", FILEPATH3, "paint/canvas", 386, "interact", "Pattern match failed, no pattern matched the value.", {
         value: $1,
-        start: 10876,
-        end: 10935,
-        pattern_start: 10887,
-        pattern_end: 10900
+        start: 10877,
+        end: 10936,
+        pattern_start: 10888,
+        pattern_end: 10901
       });
     }
     let new_state = update(old_state, new MouseMoved(x, y));
@@ -2933,10 +2961,10 @@ function interact(init, update, view, selector) {
         } else {
           throw makeError("let_assert", FILEPATH3, "paint/canvas", 415, "interact", "Pattern match failed, no pattern matched the value.", {
             value: $3,
-            start: 11869,
-            end: 11928,
-            pattern_start: 11880,
-            pattern_end: 11893
+            start: 11870,
+            end: 11929,
+            pattern_start: 11881,
+            pattern_end: 11894
           });
         }
         let new_state = update(old_state, constructor(button));
@@ -3050,31 +3078,38 @@ function paper_rect(pos, size3, color) {
 }
 function default_stack(scale2) {
   return new Stack(toList([
-    paper_rect([0, 0], [300 * scale2, 500 * scale2], colour_hex("#C0BAA8")),
-    paper_rect([0, 0], [300 * scale2, 500 * scale2], colour_hex("#F1E9D2"))
+    paper_rect([0, 0], [300 * scale2, 500 * scale2], colour_hex("#bda583")),
+    paper_rect([0, 0], [300 * scale2, 500 * scale2], colour_hex("#cdba94"))
   ]));
 }
-function transform(layer, callback) {
+function transform(layer, callback, apply_to_animation) {
   if (layer instanceof Layer) {
-    let points = layer.points;
-    return new Layer(map3(points, callback), layer.animation, layer.color);
+    let points$1 = layer.points;
+    let animation = layer.animation;
+    return new Layer(map3(points$1, callback), (() => {
+      if (apply_to_animation) {
+        return map3(animation, callback);
+      } else {
+        return animation;
+      }
+    })(), layer.color);
   } else if (layer instanceof Stack) {
     let layers = layer[0];
     return new Stack(map3(layers, (_capture) => {
-      return transform(_capture, callback);
+      return transform(_capture, callback, apply_to_animation);
     }));
   } else {
     let top = layer.top;
     let bottom = layer.bottom;
     let p1 = layer.crease[0];
     let p2 = layer.crease[1];
-    return new Fold(transform(top, callback), transform(bottom, callback), [callback(p1), callback(p2)]);
+    return new Fold(transform(top, callback, apply_to_animation), transform(bottom, callback, apply_to_animation), [callback(p1), callback(p2)]);
   }
 }
 function all_points(layer) {
   if (layer instanceof Layer) {
-    let points = layer.points;
-    return points;
+    let points$1 = layer.points;
+    return points$1;
   } else if (layer instanceof Stack) {
     let layers = layer[0];
     return flat_map(layers, all_points);
@@ -3095,8 +3130,8 @@ function flip(layer, flip_line) {
     return [x - a * k, y - b * k];
   };
   if (layer instanceof Layer) {
-    let points = layer.points;
-    return new Layer(map3(points, (_capture) => {
+    let points$1 = layer.points;
+    return new Layer(map3(points$1, (_capture) => {
       return reflect(_capture, flip_line);
     }), layer.animation, layer.color);
   } else if (layer instanceof Stack) {
@@ -3113,9 +3148,9 @@ function flip(layer, flip_line) {
   }
 }
 function center(layer) {
-  let points = all_points(layer);
-  let count = identity(length(points));
-  let center$1 = fold2(points, [0, 0], (center2, point) => {
+  let points$1 = all_points(layer);
+  let count = identity(length(points$1));
+  let center$1 = fold2(points$1, [0, 0], (center2, point) => {
     return [center2[0] + point[0], center2[1] + point[1]];
   });
   let center$2 = [
@@ -3124,46 +3159,73 @@ function center(layer) {
   ];
   return transform(layer, (p) => {
     return [p[0] - center$2[0], p[1] - center$2[1]];
-  });
+  }, false);
+}
+function points(layer, midpoints) {
+  if (layer instanceof Layer) {
+    let points$1 = layer.points;
+    if (midpoints) {
+      return flatten(map_fold(points$1, lazy_unwrap(last(points$1), () => {
+        throw makeError("panic", FILEPATH4, "layer", 120, "points", "`panic` expression evaluated.", {});
+      }), (last2, point) => {
+        return [
+          point,
+          toList([
+            point,
+            [(last2[0] + point[0]) / 2, (last2[1] + point[1]) / 2]
+          ])
+        ];
+      })[1]);
+    } else {
+      return points$1;
+    }
+  } else if (layer instanceof Stack) {
+    let layers = layer[0];
+    return flatten(map3(layers, (_capture) => {
+      return points(_capture, midpoints);
+    }));
+  } else {
+    let top = layer.top;
+    let bottom = layer.bottom;
+    return append(points(top, midpoints), points(bottom, midpoints));
+  }
 }
 function bottommost(loop$layer) {
   while (true) {
     let layer = loop$layer;
-    if (layer instanceof Layer) {
-      let points = layer.points;
-      return points;
-    } else if (layer instanceof Stack) {
+    if (layer instanceof Stack) {
       let $ = layer[0];
       if ($ instanceof Empty) {
-        return List$Empty$const;
+        return layer;
       } else {
         let layer$1 = $.head;
         loop$layer = layer$1;
       }
-    } else {
+    } else if (layer instanceof Fold) {
       let layer$1 = layer.bottom;
       loop$layer = layer$1;
+    } else {
+      return layer;
     }
   }
 }
 function topmost(loop$layer) {
   while (true) {
     let layer = loop$layer;
-    if (layer instanceof Layer) {
-      return layer;
-    } else if (layer instanceof Stack) {
+    if (layer instanceof Stack) {
       let layers = layer[0];
-      loop$layer = lazy_unwrap(last(layers), () => {
-        throw makeError("panic", FILEPATH4, "layer", 112, "topmost", "`panic` expression evaluated.", {});
-      });
-    } else {
+      let _pipe = map4(last(layers), topmost);
+      return unwrap2(_pipe, layer);
+    } else if (layer instanceof Fold) {
       let layer$1 = layer.top;
       loop$layer = layer$1;
+    } else {
+      return layer;
     }
   }
 }
 function align(layer, segments) {
-  let $ = bottommost(layer);
+  let $ = points(bottommost(layer), false);
   if ($ instanceof Empty) {
     return layer;
   } else {
@@ -3188,7 +3250,7 @@ function align(layer, segments) {
       let cos3 = cos2(0 - angle$2);
       return transform(layer, (p) => {
         return [p[0] * cos3 - p[1] * sin3, p[0] * sin3 + p[1] * cos3];
-      });
+      }, false);
     }
   }
 }
@@ -3227,9 +3289,9 @@ function area(layer) {
 }
 function update_animation(layer) {
   if (layer instanceof Layer) {
-    let points = layer.points;
+    let points$1 = layer.points;
     let animation = layer.animation;
-    return new Layer(points, map3(zip(points, animation), (e) => {
+    return new Layer(points$1, map3(zip(points$1, animation), (e) => {
       let target = e[0];
       let p = e[1];
       return [
@@ -3265,7 +3327,7 @@ function draw_layer(layer) {
           map3(rest, path_line),
           toList([path_line(p1), path_line(p2)])
         ])));
-        let _pipe$1 = stroke(_pipe, black, 3);
+        let _pipe$1 = stroke(_pipe, colour_hex("#292418"), 3);
         return fill(_pipe$1, color);
       }
     }
@@ -3353,8 +3415,10 @@ function match(a, b, scale2) {
 var FILEPATH5 = "src/folding.gleam";
 
 class Paper extends CustomType {
-  constructor(mouse, line, layers) {
+  constructor(shift, pan, mouse, line, layers) {
     super();
+    this.shift = shift;
+    this.pan = pan;
     this.mouse = mouse;
     this.line = line;
     this.layers = layers;
@@ -3448,8 +3512,8 @@ function split3(layer, fold_line) {
     }
   };
   if (layer instanceof Layer) {
-    let points = layer.points;
-    let polys = chunk(points, (_capture) => {
+    let points2 = layer.points;
+    let polys = chunk(points2, (_capture) => {
       return above_line(_capture, fold_line);
     });
     let _block;
@@ -3533,9 +3597,23 @@ function split3(layer, fold_line) {
           });
           let p1 = line_intersection(points2line(a1, b2), fold_line);
           let p2 = line_intersection(points2line(a2, b1), fold_line);
+          let reduce2 = (point, anchor) => {
+            let $2 = [anchor[0] - point[0], anchor[1] - point[1]];
+            let dx = $2[0];
+            let dy = $2[1];
+            let dst = dx * dx + dy * dy;
+            let $3 = dst < 3 * 3;
+            if ($3) {
+              return List$Empty$const;
+            } else {
+              return toList([point]);
+            }
+          };
+          let points_a = flatten(toList([reduce2(p1, a1), a, reduce2(p2, a2)]));
+          let points_b = flatten(toList([reduce2(p2, b1), b, reduce2(p1, b2)]));
           return [
-            new Some(new Layer(flatten(toList([toList([p1]), a, toList([p2])])), flatten(toList([toList([p1]), a, toList([p2])])), layer.color)),
-            new Some(new Layer(flatten(toList([toList([p2]), b, toList([p1])])), flatten(toList([toList([p2]), b, toList([p1])])), layer.color)),
+            new Some(new Layer(points_a, points_a, layer.color)),
+            new Some(new Layer(points_b, points_b, layer.color)),
             new Some([p1, p2])
           ];
         } else {
@@ -3716,32 +3794,34 @@ function continuous_time() {
   return identity(time()) / 1000;
 }
 function randomize(layer) {
-  let top_layer = topmost(layer);
-  let _block;
-  if (top_layer instanceof Layer) {
-    let points2 = top_layer.points;
-    _block = points2;
-  } else {
-    throw makeError("panic", FILEPATH5, "folding", 275, "randomize", "`panic` expression evaluated.", {});
-  }
-  let points = _block;
+  let topmost2 = topmost(layer);
+  let points2 = points(topmost2, true);
   return ((callback) => {
     return unwrap2(find_map((() => {
-      let _pipe = points;
+      let _pipe = points2;
       return shuffle(_pipe);
     })(), callback), layer);
   })((point) => {
-    let dirs = toList([[1, 0], [1, 1], [0, 1], [-1, 1]]);
+    let dirs = toList([
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [-1, 1],
+      [-1, 0],
+      [-1, -1],
+      [0, -1],
+      [1, -1]
+    ]);
     return find_map(dirs, (dir) => {
       let line = points2line(point, [point[0] + dir[0], point[1] + dir[1]]);
-      let $ = split3(top_layer, line);
+      let $ = split3(topmost2, line);
       let $1 = $[0];
       if ($1 instanceof Some) {
         let $2 = $[1];
         if ($2 instanceof Some) {
           let l1 = $1[0];
           let l2 = $2[0];
-          let $3 = min2(echo(area(l1), undefined, "src/folding.gleam", 294), echo(area(l2), undefined, "src/folding.gleam", 294)) > 5;
+          let $3 = min2(area(l1), area(l2)) > 5;
           if ($3) {
             return new Ok(fold4(layer, line, (layer2) => {
               return layer2;
@@ -3759,121 +3839,161 @@ function randomize(layer) {
   });
 }
 function init() {
-  return new Paper([0, 0], Option$None$const, toList([default_stack(1)]));
+  return new Paper(false, false, [0, 0], Option$None$const, toList([default_stack(1)]));
+}
+function snap(p0, points2, backup) {
+  let dst = (a, b) => {
+    return (b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]);
+  };
+  let closest = max(points2, (p1, p2) => {
+    return compare(dst(p0, p2), dst(p0, p1));
+  });
+  let closest_backup = max(backup, (p1, p2) => {
+    return compare(dst(p0, p2), dst(p0, p1));
+  });
+  return unwrap2(try$(closest, (p1) => {
+    let $ = dst(p0, p1) < 12 * 12;
+    if ($) {
+      return new Ok(p1);
+    } else {
+      return new Error(undefined);
+    }
+  }), unwrap2(closest_backup, p0));
 }
 function update(state, event) {
-  let $ = state.layers;
-  if ($ instanceof Empty) {
-    if (event instanceof MouseMoved) {
-      let x = event[0];
-      let y = event[1];
-      return new Paper([x - width() / 2, y - height() / 2], state.line, state.layers);
-    } else if (event instanceof MousePressed) {
-      let $1 = event[0];
-      if ($1 instanceof MouseButtonLeft) {
-        return new Paper(state.mouse, new Some(state.mouse), state.layers);
-      } else {
+  if (event instanceof Tick) {
+    let $ = state.layers;
+    if ($ instanceof Empty) {
+      return state;
+    } else {
+      let layer = $.head;
+      let rest = $.tail;
+      return new Paper(state.shift, state.pan, state.mouse, state.line, prepend(update_animation(layer), rest));
+    }
+  } else if (event instanceof KeyboardPressed) {
+    let $ = event[0];
+    if ($ instanceof KeySpace) {
+      let $1 = state.layers;
+      if ($1 instanceof Empty) {
         return state;
+      } else {
+        let layer = $1.head;
+        let rest = $1.tail;
+        return new Paper(state.shift, state.pan, state.mouse, state.line, prepend(align(center(layer), 4), rest));
       }
+    } else if ($ instanceof KeyBackspace) {
+      let $1 = state.layers;
+      if ($1 instanceof Empty) {
+        return state;
+      } else {
+        let $2 = $1.tail;
+        if ($2 instanceof Empty) {
+          return state;
+        } else {
+          let previous = $2.head;
+          let rest = $2.tail;
+          return new Paper(state.shift, state.pan, state.mouse, state.line, prepend(previous, rest));
+        }
+      }
+    } else if ($ instanceof KeyShift) {
+      return new Paper(true, state.pan, state.mouse, state.line, state.layers);
+    } else {
+      return state;
+    }
+  } else if (event instanceof KeyboardReleased) {
+    let $ = event[0];
+    if ($ instanceof KeyShift) {
+      return new Paper(false, state.pan, state.mouse, state.line, state.layers);
+    } else {
+      return state;
+    }
+  } else if (event instanceof MouseMoved) {
+    let $ = state.layers;
+    if ($ instanceof Empty) {
+      return state;
+    } else {
+      let $1 = state.pan;
+      if ($1) {
+        let x = event[0];
+        let y = event[1];
+        let old_mouse = state.mouse;
+        let layer = $.head;
+        let rest = $.tail;
+        let mouse = [x - width() / 2, y - height() / 2];
+        let $2 = [mouse[0] - old_mouse[0], mouse[1] - old_mouse[1]];
+        let dx = $2[0];
+        let dy = $2[1];
+        return new Paper(state.shift, state.pan, mouse, state.line, prepend(transform(layer, (point) => {
+          return [point[0] + dx, point[1] + dy];
+        }, true), rest));
+      } else {
+        let x = event[0];
+        let y = event[1];
+        let shift = state.shift;
+        let line = state.line;
+        let layer = $.head;
+        let mouse = [x - width() / 2, y - height() / 2];
+        let _block;
+        if (shift && line instanceof Some) {
+          let start = line[0];
+          let dirs = toList([[1, 0], [1, 1], [0, 1], [-1, 1]]);
+          let line_snaps = map3(dirs, (dir) => {
+            return line_intersection(points2line(start, [start[0] + dir[0], start[1] + dir[1]]), points2line(mouse, [mouse[0] - dir[1], mouse[1] + dir[0]]));
+          });
+          _block = snap(mouse, points(layer, true), line_snaps);
+        } else {
+          _block = mouse;
+        }
+        let mouse$1 = _block;
+        return new Paper(state.shift, state.pan, mouse$1, state.line, state.layers);
+      }
+    }
+  } else if (event instanceof MousePressed) {
+    let $ = event[0];
+    if ($ instanceof MouseButtonLeft) {
+      let $1 = state.layers;
+      if ($1 instanceof Empty) {
+        return state;
+      } else {
+        let shift = state.shift;
+        let mouse = state.mouse;
+        let layer = $1.head;
+        return new Paper(state.shift, state.pan, state.mouse, new Some((() => {
+          if (shift) {
+            return snap(mouse, points(layer, true), List$Empty$const);
+          } else {
+            return mouse;
+          }
+        })()), state.layers);
+      }
+    } else if ($ instanceof MouseButtonMiddle) {
+      return new Paper(state.shift, true, state.mouse, state.line, state.layers);
     } else {
       return state;
     }
   } else {
-    let $1 = $.tail;
-    if ($1 instanceof Empty) {
-      if (event instanceof Tick) {
-        let layer = $.head;
-        let rest = $1;
-        return new Paper(state.mouse, state.line, prepend(update_animation(layer), rest));
-      } else if (event instanceof KeyboardPressed) {
-        let $2 = event[0];
-        if ($2 instanceof KeySpace) {
-          let layer = $.head;
-          let rest = $1;
-          return new Paper(state.mouse, state.line, prepend(align(center(layer), 4), rest));
-        } else {
+    let $ = event[0];
+    if ($ instanceof MouseButtonLeft) {
+      let $1 = state.line;
+      if ($1 instanceof Some) {
+        let $2 = state.layers;
+        if ($2 instanceof Empty) {
           return state;
-        }
-      } else if (event instanceof MouseMoved) {
-        let x = event[0];
-        let y = event[1];
-        return new Paper([x - width() / 2, y - height() / 2], state.line, state.layers);
-      } else if (event instanceof MousePressed) {
-        let $2 = event[0];
-        if ($2 instanceof MouseButtonLeft) {
-          return new Paper(state.mouse, new Some(state.mouse), state.layers);
         } else {
-          return state;
-        }
-      } else if (event instanceof MouseReleased) {
-        let $2 = state.line;
-        if ($2 instanceof Some) {
-          let $3 = event[0];
-          if ($3 instanceof MouseButtonLeft) {
-            let mouse = state.mouse;
-            let layer = $.head;
-            let rest = $1;
-            let start = $2[0];
-            let fold_line = points2line(start, mouse);
-            return new Paper(state.mouse, Option$None$const, prepend(fold4(layer, fold_line, (layer2) => {
-              return layer2;
-            })[0], prepend(layer, rest)));
-          } else {
-            return state;
-          }
-        } else {
-          return state;
-        }
-      } else {
-        return state;
-      }
-    } else if (event instanceof Tick) {
-      let layer = $.head;
-      let rest = $1;
-      return new Paper(state.mouse, state.line, prepend(update_animation(layer), rest));
-    } else if (event instanceof KeyboardPressed) {
-      let $2 = event[0];
-      if ($2 instanceof KeySpace) {
-        let layer = $.head;
-        let rest = $1;
-        return new Paper(state.mouse, state.line, prepend(align(center(layer), 4), rest));
-      } else if ($2 instanceof KeyBackspace) {
-        let previous = $1.head;
-        let rest = $1.tail;
-        return new Paper(state.mouse, state.line, prepend(previous, rest));
-      } else {
-        return state;
-      }
-    } else if (event instanceof MouseMoved) {
-      let x = event[0];
-      let y = event[1];
-      return new Paper([x - width() / 2, y - height() / 2], state.line, state.layers);
-    } else if (event instanceof MousePressed) {
-      let $2 = event[0];
-      if ($2 instanceof MouseButtonLeft) {
-        return new Paper(state.mouse, new Some(state.mouse), state.layers);
-      } else {
-        return state;
-      }
-    } else if (event instanceof MouseReleased) {
-      let $2 = state.line;
-      if ($2 instanceof Some) {
-        let $3 = event[0];
-        if ($3 instanceof MouseButtonLeft) {
           let mouse = state.mouse;
-          let layer = $.head;
-          let rest = $1;
-          let start = $2[0];
+          let start = $1[0];
+          let layer = $2.head;
+          let rest = $2.tail;
           let fold_line = points2line(start, mouse);
-          return new Paper(state.mouse, Option$None$const, prepend(fold4(layer, fold_line, (layer2) => {
+          return new Paper(state.shift, state.pan, state.mouse, Option$None$const, prepend(fold4(layer, fold_line, (layer2) => {
             return layer2;
           })[0], prepend(layer, rest)));
-        } else {
-          return state;
         }
       } else {
         return state;
       }
+    } else if ($ instanceof MouseButtonMiddle) {
+      return new Paper(state.shift, false, state.mouse, state.line, state.layers);
     } else {
       return state;
     }
@@ -3904,228 +4024,12 @@ function view(state) {
   ]));
   return translate_xy(_pipe, width() / 2, height() / 2);
 }
-function echo(value, message, file, line) {
-  const grey = "\x1B[90m";
-  const reset_color = "\x1B[39m";
-  const file_line = `${file}:${line}`;
-  const inspector = new Echo$Inspector;
-  const string_value = inspector.inspect(value);
-  const string_message = message === undefined ? "" : " " + message;
-  if (globalThis.process?.stderr?.write) {
-    const string4 = `${grey}${file_line}${reset_color}${string_message}
-${string_value}
-`;
-    globalThis.process.stderr.write(string4);
-  } else if (globalThis.Deno) {
-    const string4 = `${grey}${file_line}${reset_color}${string_message}
-${string_value}
-`;
-    globalThis.Deno.stderr.writeSync(new TextEncoder().encode(string4));
-  } else {
-    const string4 = `${file_line}${string_message}
-${string_value}`;
-    globalThis.console.log(string4);
-  }
-  return value;
-}
-
-class Echo$Inspector {
-  #references = new globalThis.Set;
-  #isDict(value) {
-    try {
-      const empty_dict = make();
-      const dict_class = empty_dict.constructor;
-      return value instanceof dict_class;
-    } catch {
-      return false;
-    }
-  }
-  #float(float4) {
-    const string4 = float4.toString().replace("+", "");
-    if (string4.indexOf(".") >= 0) {
-      return string4;
-    } else {
-      const index3 = string4.indexOf("e");
-      if (index3 >= 0) {
-        return string4.slice(0, index3) + ".0" + string4.slice(index3);
-      } else {
-        return string4 + ".0";
-      }
-    }
-  }
-  inspect(v) {
-    const t = typeof v;
-    if (v === true)
-      return "True";
-    if (v === false)
-      return "False";
-    if (v === null)
-      return "//js(null)";
-    if (v === undefined)
-      return "Nil";
-    if (t === "string")
-      return this.#string(v);
-    if (t === "bigint" || globalThis.Number.isInteger(v))
-      return v.toString();
-    if (t === "number")
-      return this.#float(v);
-    if (v instanceof UtfCodepoint)
-      return this.#utfCodepoint(v);
-    if (v instanceof BitArray)
-      return this.#bit_array(v);
-    if (v instanceof globalThis.RegExp)
-      return `//js(${v})`;
-    if (v instanceof globalThis.Date)
-      return `//js(Date("${v.toISOString()}"))`;
-    if (v instanceof globalThis.Error)
-      return `//js(${v.toString()})`;
-    if (v instanceof globalThis.Function) {
-      const args = [];
-      for (const i of globalThis.Array(v.length).keys())
-        args.push(globalThis.String.fromCharCode(i + 97));
-      return `//fn(${args.join(", ")}) { ... }`;
-    }
-    if (this.#references.size === this.#references.add(v).size) {
-      return "//js(circular reference)";
-    }
-    let printed;
-    if (globalThis.Array.isArray(v)) {
-      printed = `#(${v.map((v2) => this.inspect(v2)).join(", ")})`;
-    } else if (v instanceof List) {
-      printed = this.#list(v);
-    } else if (v instanceof CustomType) {
-      printed = this.#customType(v);
-    } else if (this.#isDict(v)) {
-      printed = this.#dict(v);
-    } else if (v instanceof Set) {
-      return `//js(Set(${[...v].map((v2) => this.inspect(v2)).join(", ")}))`;
-    } else {
-      printed = this.#object(v);
-    }
-    this.#references.delete(v);
-    return printed;
-  }
-  #object(v) {
-    const name = globalThis.Object.getPrototypeOf(v)?.constructor?.name || "Object";
-    const props = [];
-    for (const k of globalThis.Object.keys(v)) {
-      props.push(`${this.inspect(k)}: ${this.inspect(v[k])}`);
-    }
-    const body = props.length ? " " + props.join(", ") + " " : "";
-    const head = name === "Object" ? "" : name + " ";
-    return `//js(${head}{${body}})`;
-  }
-  #dict(map6) {
-    let body = "dict.from_list([";
-    let first2 = true;
-    let key_value_pairs = fold(map6, [], (pairs, key, value) => {
-      pairs.push([key, value]);
-      return pairs;
-    });
-    key_value_pairs.sort();
-    key_value_pairs.forEach(([key, value]) => {
-      if (!first2)
-        body = body + ", ";
-      body = body + "#(" + this.inspect(key) + ", " + this.inspect(value) + ")";
-      first2 = false;
-    });
-    return body + "])";
-  }
-  #customType(record) {
-    const props = globalThis.Object.keys(record).map((label) => {
-      const value = this.inspect(record[label]);
-      return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
-    }).join(", ");
-    return props ? `${record.constructor.name}(${props})` : record.constructor.name;
-  }
-  #list(list3) {
-    if (list3 instanceof Empty) {
-      return "[]";
-    }
-    let char_out = 'charlist.from_string("';
-    let list_out = "[";
-    let current = list3;
-    while (current instanceof NonEmpty) {
-      let element = current.head;
-      current = current.tail;
-      if (list_out !== "[") {
-        list_out += ", ";
-      }
-      list_out += this.inspect(element);
-      if (char_out) {
-        if (globalThis.Number.isInteger(element) && element >= 32 && element <= 126) {
-          char_out += globalThis.String.fromCharCode(element);
-        } else {
-          char_out = null;
-        }
-      }
-    }
-    if (char_out) {
-      return char_out + '")';
-    } else {
-      return list_out + "]";
-    }
-  }
-  #string(str) {
-    let new_str = '"';
-    for (let i = 0;i < str.length; i++) {
-      const char = str[i];
-      switch (char) {
-        case `
-`:
-          new_str += "\\n";
-          break;
-        case "\r":
-          new_str += "\\r";
-          break;
-        case "\t":
-          new_str += "\\t";
-          break;
-        case "\f":
-          new_str += "\\f";
-          break;
-        case "\\":
-          new_str += "\\\\";
-          break;
-        case '"':
-          new_str += "\\\"";
-          break;
-        default:
-          if (char < " " || char > "~" && char < " ") {
-            new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
-          } else {
-            new_str += char;
-          }
-      }
-    }
-    new_str += '"';
-    return new_str;
-  }
-  #utfCodepoint(codepoint2) {
-    return `//utfcodepoint(${globalThis.String.fromCodePoint(codepoint2.value)})`;
-  }
-  #bit_array(bits2) {
-    if (bits2.bitSize === 0) {
-      return "<<>>";
-    }
-    let acc = "<<";
-    for (let i = 0;i < bits2.byteSize - 1; i++) {
-      acc += bits2.byteAt(i).toString();
-      acc += ", ";
-    }
-    if (bits2.byteSize * 8 === bits2.bitSize) {
-      acc += bits2.byteAt(bits2.byteSize - 1).toString();
-    } else {
-      const trailingBitsCount = bits2.bitSize % 8;
-      acc += bits2.byteAt(bits2.byteSize - 1) >> 8 - trailingBitsCount;
-      acc += `:size(${trailingBitsCount})`;
-    }
-    acc += ">>";
-    return acc;
-  }
-}
 
 // build/dev/javascript/paper/paper.mjs
+class TitleScreen extends CustomType {
+}
+var State$TitleScreen$const = new TitleScreen;
+
 class State extends CustomType {
   constructor(paper2, tasks, score, animated_score, reset_timer) {
     super();
@@ -4137,113 +4041,202 @@ class State extends CustomType {
   }
 }
 function init2(_) {
-  return new State(init(), List$Empty$const, 0, 0, Option$None$const);
+  return State$TitleScreen$const;
 }
 function update2(state, event) {
-  let paper2 = state.paper;
-  let tasks = state.tasks;
-  let score = state.score;
-  let animated_score = state.animated_score;
-  let reset_timer = state.reset_timer;
-  let tasks$1 = index_map(tasks, (task, index3) => {
-    let task$1 = task[0];
-    let y = task[1];
-    let reset3 = task[2];
-    return [
-      update_animation(task$1),
-      y + (identity(index3) - y) * 0.1,
-      reset3
-    ];
-  });
-  let paper$1 = update(paper2, event);
-  let animated_score$1 = animated_score + (score - animated_score) * 0.1;
-  let _block;
-  let $ = is_empty2(tasks$1);
-  if ($) {
-    let iterations = min(round(floor(score / 500)) + 1, 4);
-    let batch = reverse2(scan(repeat(0, iterations), default_stack(0.25), (layer, _) => {
-      return center(randomize(layer));
-    }));
-    _block = append(index_map(batch, (layer, index3) => {
-      return [layer, 0, index3 === 0];
-    }), tasks$1);
+  if (state instanceof TitleScreen) {
+    if (event instanceof MousePressed) {
+      let $ = event[0];
+      if ($ instanceof MouseButtonLeft) {
+        return new State(init(), List$Empty$const, 0, 0, Option$None$const);
+      } else {
+        return State$TitleScreen$const;
+      }
+    } else {
+      return State$TitleScreen$const;
+    }
   } else {
-    _block = tasks$1;
-  }
-  let tasks$2 = _block;
-  let ntasks = length(tasks$2);
-  let _block$1;
-  let $2 = paper$1.layers;
-  if ($2 instanceof Empty) {
-    _block$1 = [tasks$2, score, false];
-  } else if (event instanceof MouseReleased) {
-    let $32 = event[0];
-    if ($32 instanceof MouseButtonLeft) {
-      let layer = $2.head;
-      let layer$1 = align(center(layer), 1);
-      _block$1 = fold_right(tasks$2, [List$Empty$const, score, true], (state2, task) => {
-        let tasks$32 = state2[0];
-        let score$12 = state2[1];
-        let reset3 = state2[2];
-        let $4 = match(layer$1, align(task[0], 1), 0.25);
-        if ($4 instanceof Some) {
-          let accuracy = $4[0];
-          return [tasks$32, score$12 + accuracy * 100, reset3 && task[2]];
-        } else {
-          return [prepend(task, tasks$32), score$12, reset3];
-        }
-      });
+    let paper2 = state.paper;
+    let tasks = state.tasks;
+    let score = state.score;
+    let animated_score = state.animated_score;
+    let reset_timer = state.reset_timer;
+    let tasks$1 = index_map(tasks, (task, index3) => {
+      let task$1 = task[0];
+      let y = task[1];
+      let reset3 = task[2];
+      return [
+        update_animation(task$1),
+        y + (identity(index3) - y) * 0.1,
+        reset3
+      ];
+    });
+    let paper$1 = update(paper2, event);
+    let animated_score$1 = animated_score + (score - animated_score) * 0.1;
+    let _block;
+    let $ = is_empty2(tasks$1);
+    if ($) {
+      let iterations = min(round(floor(score / 500)) + 1, 4);
+      let batch = reverse2(scan(repeat(0, iterations), default_stack(0.25), (layer, _) => {
+        return center(randomize(layer));
+      }));
+      _block = append(index_map(batch, (layer, index3) => {
+        return [layer, 0, index3 === 0];
+      }), tasks$1);
+    } else {
+      _block = tasks$1;
+    }
+    let tasks$2 = _block;
+    let ntasks = length(tasks$2);
+    let _block$1;
+    let $2 = paper$1.layers;
+    if ($2 instanceof Empty) {
+      _block$1 = [tasks$2, score, false];
+    } else if (event instanceof MouseReleased) {
+      let $32 = event[0];
+      if ($32 instanceof MouseButtonLeft) {
+        let layer = $2.head;
+        let layer$1 = align(center(layer), 1);
+        _block$1 = fold_right(tasks$2, [List$Empty$const, score, true], (state2, task) => {
+          let tasks$32 = state2[0];
+          let score$12 = state2[1];
+          let reset3 = state2[2];
+          let $4 = match(layer$1, align(task[0], 1), 0.25);
+          if ($4 instanceof Some) {
+            let accuracy = $4[0];
+            return [tasks$32, score$12 + accuracy * 100, reset3 && task[2]];
+          } else {
+            return [prepend(task, tasks$32), score$12, reset3];
+          }
+        });
+      } else {
+        _block$1 = [tasks$2, score, false];
+      }
     } else {
       _block$1 = [tasks$2, score, false];
     }
-  } else {
-    _block$1 = [tasks$2, score, false];
-  }
-  let $1 = _block$1;
-  let tasks$3 = $1[0];
-  let score$1 = $1[1];
-  let reset2 = $1[2];
-  let reset$1 = length(tasks$3) !== ntasks && reset2;
-  let time2 = continuous_time();
-  let _block$2;
-  if (reset$1) {
-    _block$2 = new Some(time2 + 0.3);
-  } else {
-    _block$2 = reset_timer;
-  }
-  let reset_timer$1 = _block$2;
-  let _block$3;
-  if (reset_timer$1 instanceof Some) {
-    let reset_timer$22 = reset_timer$1[0];
-    if (time2 > reset_timer$22) {
-      _block$3 = [
-        new Paper(paper$1.mouse, paper$1.line, toList([default_stack(1)])),
-        Option$None$const
-      ];
+    let $1 = _block$1;
+    let tasks$3 = $1[0];
+    let score$1 = $1[1];
+    let reset2 = $1[2];
+    let reset$1 = length(tasks$3) !== ntasks && reset2;
+    let time2 = continuous_time();
+    let _block$2;
+    if (reset$1) {
+      _block$2 = new Some(time2 + 0.3);
+    } else {
+      _block$2 = reset_timer;
+    }
+    let reset_timer$1 = _block$2;
+    let _block$3;
+    if (reset_timer$1 instanceof Some) {
+      let reset_timer$22 = reset_timer$1[0];
+      if (time2 > reset_timer$22) {
+        _block$3 = [
+          new Paper(paper$1.shift, paper$1.pan, paper$1.mouse, paper$1.line, toList([default_stack(1)])),
+          Option$None$const
+        ];
+      } else {
+        _block$3 = [paper$1, reset_timer$1];
+      }
     } else {
       _block$3 = [paper$1, reset_timer$1];
     }
-  } else {
-    _block$3 = [paper$1, reset_timer$1];
+    let $3 = _block$3;
+    let paper$2 = $3[0];
+    let reset_timer$2 = $3[1];
+    return new State(paper$2, tasks$3, score$1, animated_score$1, reset_timer$2);
   }
-  let $3 = _block$3;
-  let paper$2 = $3[0];
-  let reset_timer$2 = $3[1];
-  return new State(paper$2, tasks$3, score$1, animated_score$1, reset_timer$2);
+}
+function outline(picture, color, outline2, width2) {
+  let $ = [width2, width2 / 1.4142];
+  let dp = $[0];
+  let ddp = $[1];
+  let $1 = [0 - dp, 0 - ddp];
+  let dn = $1[0];
+  let ddn = $1[1];
+  return combine(toList([
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, ddn, ddn);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, 0, dn);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, ddp, ddn);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, dn, 0);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, dp, 0);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, ddn, ddp);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, 0, dp);
+    })(),
+    (() => {
+      let _pipe = picture;
+      let _pipe$1 = fill(_pipe, outline2);
+      return translate_xy(_pipe$1, ddp, ddp);
+    })(),
+    (() => {
+      let _pipe = picture;
+      return fill(_pipe, color);
+    })()
+  ]));
 }
 function view2(state) {
-  return combine(prepend(view(state.paper), prepend((() => {
-    let _pipe = text(to_string(round(state.animated_score)), 80);
-    let _pipe$1 = text_align(_pipe, TextAlign$TextAlignCenter$const2);
-    let _pipe$2 = text_baseline(_pipe$1, TextBaseline$TextBaselineTop$const2);
-    let _pipe$3 = translate_xy(_pipe$2, width() / 2, 10);
-    return fill(_pipe$3, colour_hex("#AAAAAA"));
-  })(), map3(state.tasks, (task) => {
-    let layer = task[0];
-    let index3 = task[1];
-    let _pipe = draw_layer(layer);
-    return translate_xy(_pipe, width() - 100, 150 * index3 + 75);
-  }))));
+  if (state instanceof TitleScreen) {
+    return combine(toList([
+      (() => {
+        let _pipe = text("Fold.me!", 180);
+        let _pipe$1 = text_align(_pipe, TextAlign$TextAlignCenter$const2);
+        let _pipe$2 = text_baseline(_pipe$1, TextBaseline$TextBaselineMiddle$const2);
+        let _pipe$3 = translate_xy(_pipe$2, width() / 2, height() * 0.3);
+        return outline(_pipe$3, colour_hex("#8b7d62"), colour_hex("#292418"), 5);
+      })(),
+      (() => {
+        let _pipe = text("Click to play!", 100);
+        let _pipe$1 = text_align(_pipe, TextAlign$TextAlignCenter$const2);
+        let _pipe$2 = text_baseline(_pipe$1, TextBaseline$TextBaselineMiddle$const2);
+        let _pipe$3 = translate_xy(_pipe$2, width() / 2, height() * 0.5);
+        return fill(_pipe$3, colour_hex("#73654a"));
+      })()
+    ]));
+  } else {
+    let paper2 = state.paper;
+    let tasks = state.tasks;
+    let animated_score = state.animated_score;
+    return combine(prepend(view(paper2), prepend((() => {
+      let _pipe = text(to_string(round(animated_score)), 80);
+      let _pipe$1 = text_align(_pipe, TextAlign$TextAlignCenter$const2);
+      let _pipe$2 = text_baseline(_pipe$1, TextBaseline$TextBaselineTop$const2);
+      let _pipe$3 = translate_xy(_pipe$2, width() / 2, 10);
+      return fill(_pipe$3, colour_hex("#8b7d62"));
+    })(), map3(tasks, (task) => {
+      let layer = task[0];
+      let index3 = task[1];
+      let _pipe = draw_layer(layer);
+      return translate_xy(_pipe, width() - 100, 150 * index3 + 75);
+    }))));
+  }
 }
 function main() {
   return interact(init2, update2, view2, "#mycanvas");
