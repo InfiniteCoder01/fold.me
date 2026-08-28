@@ -302,11 +302,17 @@ pub fn randomize(layer: Layer) -> Layer {
 
 // -------------------------------- Interactive
 pub type Paper {
-  Paper(shift: Bool, mouse: Vec2, line: Option(Vec2), layers: List(Layer))
+  Paper(
+    shift: Bool,
+    pan: Bool,
+    mouse: Vec2,
+    line: Option(Vec2),
+    layers: List(Layer),
+  )
 }
 
 pub fn init() -> Paper {
-  Paper(shift: False, mouse: #(0.0, 0.0), line: None, layers: [
+  Paper(shift: False, pan: False, mouse: #(0.0, 0.0), line: None, layers: [
     l.default_stack(1.0),
   ])
 }
@@ -334,13 +340,31 @@ pub fn snap(p0: Vec2, points: List(Vec2), backup: List(Vec2)) -> Vec2 {
 
 pub fn update(state: Paper, event: event.Event) -> Paper {
   case event, state {
+    // Shift
     event.KeyboardPressed(event.KeyShift), _ -> Paper(..state, shift: True)
     event.KeyboardReleased(event.KeyShift), _ -> Paper(..state, shift: False)
+    // Pan
+    event.MousePressed(event.MouseButtonMiddle), _ -> Paper(..state, pan: True)
+    event.MouseReleased(event.MouseButtonMiddle), _ ->
+      Paper(..state, pan: False)
+    event.MouseMoved(x, y),
+      Paper(pan: True, mouse: old_mouse, layers: [layer, ..rest], ..)
+    -> {
+      let mouse = #(x -. canvas_width() /. 2.0, y -. canvas_height() /. 2.0)
+      let #(dx, dy) = #(mouse.0 -. old_mouse.0, mouse.1 -. old_mouse.1)
+      Paper(..state, mouse:, layers: [
+        l.transform(layer, fn(point) { #(point.0 +. dx, point.1 +. dy) }, True),
+        ..rest
+      ])
+    }
+    // Undo
     event.KeyboardPressed(event.KeyBackspace),
       Paper(layers: [_, previous, ..rest], ..)
     -> Paper(..state, layers: [previous, ..rest])
+    // Align
     event.KeyboardPressed(event.KeySpace), Paper(layers: [layer, ..rest], ..) ->
       Paper(..state, layers: [l.align(l.center(layer), 4), ..rest])
+    // Mouse movement
     event.MouseMoved(x, y), Paper(shift:, line:, layers: [layer, ..], ..) -> {
       let mouse = #(x -. canvas_width() /. 2.0, y -. canvas_height() /. 2.0)
       let mouse = case shift, line {
@@ -366,6 +390,7 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
       }
       Paper(..state, mouse:)
     }
+    // Fold line
     event.MousePressed(event.MouseButtonLeft),
       Paper(shift:, mouse:, layers: [layer, ..], ..)
     ->
@@ -376,6 +401,7 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
           False -> mouse
         }),
       )
+    // Fold
     event.MouseReleased(event.MouseButtonLeft),
       Paper(mouse:, line: Some(start), layers: [layer, ..rest], ..)
     -> {
@@ -386,6 +412,7 @@ pub fn update(state: Paper, event: event.Event) -> Paper {
         ..rest
       ])
     }
+    // Animation updates
     event.Tick(_), Paper(layers: [layer, ..rest], ..) ->
       Paper(..state, layers: [l.update_animation(layer), ..rest])
     _, state -> state

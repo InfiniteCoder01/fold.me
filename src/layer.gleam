@@ -45,15 +45,29 @@ pub fn default_stack(scale: Float) -> Layer {
 }
 
 // -------------------------------------- Transforms
-pub fn transform(layer: Layer, callback: fn(Vec2) -> Vec2) {
+pub fn transform(
+  layer: Layer,
+  callback: fn(Vec2) -> Vec2,
+  apply_to_animation: Bool,
+) {
   case layer {
-    Layer(points:, ..) -> Layer(..layer, points: list.map(points, callback))
-    Stack(layers) -> Stack(list.map(layers, transform(_, callback)))
+    Layer(points:, animation:, ..) ->
+      Layer(
+        ..layer,
+        points: list.map(points, callback),
+        animation: case apply_to_animation {
+          True -> list.map(animation, callback)
+          False -> animation
+        },
+      )
+    Stack(layers) ->
+      Stack(list.map(layers, transform(_, callback, apply_to_animation)))
     Fold(top:, bottom:, crease: #(p1, p2)) ->
-      Fold(transform(top, callback), transform(bottom, callback), #(
-        callback(p1),
-        callback(p2),
-      ))
+      Fold(
+        transform(top, callback, apply_to_animation),
+        transform(bottom, callback, apply_to_animation),
+        #(callback(p1), callback(p2)),
+      )
   }
 }
 
@@ -93,7 +107,7 @@ pub fn center(layer: Layer) -> Layer {
       #(center.0 +. point.0, center.1 +. point.1)
     })
   let center = #(center.0 /. count, center.1 /. count)
-  transform(layer, fn(p) { #(p.0 -. center.0, p.1 -. center.1) })
+  transform(layer, fn(p) { #(p.0 -. center.0, p.1 -. center.1) }, False)
 }
 
 pub fn points(layer: Layer, midpoints: Bool) -> List(Vec2) {
@@ -153,9 +167,11 @@ pub fn align(layer: Layer, segments: Int) -> Layer {
       let sin = maths.sin(0.0 -. angle)
       let cos = maths.cos(0.0 -. angle)
 
-      transform(layer, fn(p) {
-        #(p.0 *. cos -. p.1 *. sin, p.0 *. sin +. p.1 *. cos)
-      })
+      transform(
+        layer,
+        fn(p) { #(p.0 *. cos -. p.1 *. sin, p.0 *. sin +. p.1 *. cos) },
+        False,
+      )
     }
     _ -> layer
   }
