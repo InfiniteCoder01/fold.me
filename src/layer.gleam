@@ -3,7 +3,6 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam_community/colour
 import gleam_community/maths
 import paint.{type Vec2} as p
 
@@ -34,12 +33,12 @@ pub fn default_stack(scale: Float) -> Layer {
     paper_rect(
       #(0.0, 0.0),
       #(300.0 *. scale, 500.0 *. scale),
-      p.colour_hex("#C0BAA8"),
+      p.colour_hex("#bda583"),
     ),
     paper_rect(
       #(0.0, 0.0),
       #(300.0 *. scale, 500.0 *. scale),
-      p.colour_hex("#F1E9D2"),
+      p.colour_hex("#cdba94"),
     ),
   ])
 }
@@ -243,7 +242,7 @@ pub fn draw_layer(layer: Layer) -> p.Picture {
           [p.path_line(p1), p.path_line(p2)],
         ]),
       )
-      |> p.stroke(colour.black, 3.0)
+      |> p.stroke(p.colour_hex("#292418"), 3.0)
       |> p.fill(color)
     Stack(layers) -> p.combine(list.map(layers, draw_layer))
     Fold(top:, bottom:, ..) -> p.concat(draw_layer(bottom), draw_layer(top))
