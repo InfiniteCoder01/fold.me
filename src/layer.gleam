@@ -96,26 +96,51 @@ pub fn center(layer: Layer) -> Layer {
   transform(layer, fn(p) { #(p.0 -. center.0, p.1 -. center.1) })
 }
 
-pub fn bottommost(layer: Layer) -> List(Vec2) {
+pub fn points(layer: Layer, midpoints: Bool) -> List(Vec2) {
   case layer {
-    Layer(points:, ..) -> points
+    Layer(points:, ..) -> {
+      case midpoints {
+        True ->
+          list.flatten(
+            list.map_fold(
+              points,
+              result.lazy_unwrap(list.last(points), fn() { panic }),
+              fn(last, point) {
+                #(point, [
+                  point,
+                  #({ last.0 +. point.0 } /. 2.0, { last.1 +. point.1 } /. 2.0),
+                ])
+              },
+            ).1,
+          )
+        False -> points
+      }
+    }
+    Stack(layers) -> list.flatten(list.map(layers, points(_, midpoints)))
+    Fold(top:, bottom:, ..) ->
+      list.append(points(top, midpoints), points(bottom, midpoints))
+  }
+}
+
+pub fn bottommost(layer: Layer) -> Layer {
+  case layer {
     Stack([layer, ..]) -> bottommost(layer)
     Fold(_, layer, _) -> bottommost(layer)
-    _ -> []
+    layer -> layer
   }
 }
 
 pub fn topmost(layer: Layer) -> Layer {
   case layer {
-    Layer(..) -> layer
     Stack(layers) ->
-      topmost(result.lazy_unwrap(list.last(layers), fn() { panic }))
+      result.map(list.last(layers), topmost) |> result.unwrap(layer)
     Fold(layer, _, _) -> topmost(layer)
+    layer -> layer
   }
 }
 
 pub fn align(layer: Layer, segments: Int) -> Layer {
-  case bottommost(layer) {
+  case points(bottommost(layer), False) {
     [p1, p2, ..] -> {
       let angle = maths.atan2(p2.1 -. p1.1, p2.0 -. p1.0)
       let angle_mod = 6.2831852 /. int.to_float(segments)

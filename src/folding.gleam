@@ -117,21 +117,21 @@ fn split(
           let b2 = result.lazy_unwrap(list.last(b), fn() { panic })
           let p1 = line_intersection(points2line(a1, b2), fold_line)
           let p2 = line_intersection(points2line(a2, b1), fold_line)
+
+          let reduce = fn(point: Vec2, anchor: Vec2) {
+            let #(dx, dy) = #(anchor.0 -. point.0, anchor.1 -. point.1)
+            let dst = dx *. dx +. dy *. dy
+            case dst <. 3.0 *. 3.0 {
+              True -> []
+              False -> [point]
+            }
+          }
+
+          let points_a = list.flatten([reduce(p1, a1), a, reduce(p2, a2)])
+          let points_b = list.flatten([reduce(p2, b1), b, reduce(p1, b2)])
           #(
-            Some(
-              l.Layer(
-                ..layer,
-                points: list.flatten([[p1], a, [p2]]),
-                animation: list.flatten([[p1], a, [p2]]),
-              ),
-            ),
-            Some(
-              l.Layer(
-                ..layer,
-                points: list.flatten([[p2], b, [p1]]),
-                animation: list.flatten([[p2], b, [p1]]),
-              ),
-            ),
+            Some(l.Layer(..layer, points: points_a, animation: points_a)),
+            Some(l.Layer(..layer, points: points_b, animation: points_b)),
             Some(#(p1, p2)),
           )
         }
@@ -269,12 +269,8 @@ pub fn continuous_time() -> Float {
 }
 
 pub fn randomize(layer: Layer) -> Layer {
-  let top_layer = l.topmost(layer)
-  let points = case top_layer {
-    l.Layer(points:, ..) -> points
-    _ -> panic
-  }
-
+  let topmost = l.topmost(layer)
+  let points = l.points(topmost, True)
   use point <-
     fn(callback) {
       result.unwrap(list.find_map(points |> list.shuffle, callback), layer)
@@ -285,13 +281,17 @@ pub fn randomize(layer: Layer) -> Layer {
     #(1.0, 1.0),
     #(0.0, 1.0),
     #(-1.0, 1.0),
+    #(-1.0, 0.0),
+    #(-1.0, -1.0),
+    #(0.0, -1.0),
+    #(1.0, -1.0),
   ]
 
   list.find_map(dirs, fn(dir) {
     let line = points2line(point, #(point.0 +. dir.0, point.1 +. dir.1))
-    case split(top_layer, line) {
+    case split(topmost, line) {
       #(Some(l1), Some(l2), _) ->
-        case float.min(echo l.area(l1), echo l.area(l2)) >. 5.0 {
+        case float.min(l.area(l1), l.area(l2)) >. 5.0 {
           True -> Ok(fold(layer, line, fn(layer) { layer }).0)
           False -> Error(Nil)
         }
@@ -302,29 +302,82 @@ pub fn randomize(layer: Layer) -> Layer {
 
 // -------------------------------- Interactive
 pub type Paper {
-  Paper(mouse: Vec2, line: Option(Vec2), layers: List(Layer))
+  Paper(shift: Bool, mouse: Vec2, line: Option(Vec2), layers: List(Layer))
 }
 
 pub fn init() -> Paper {
-  Paper(mouse: #(0.0, 0.0), line: None, layers: [l.default_stack(1.0)])
+  Paper(shift: False, mouse: #(0.0, 0.0), line: None, layers: [
+    l.default_stack(1.0),
+  ])
+}
+
+pub fn snap(p0: Vec2, points: List(Vec2), backup: List(Vec2)) -> Vec2 {
+  let dst = fn(a: Vec2, b: Vec2) {
+    { b.0 -. a.0 } *. { b.0 -. a.0 } +. { b.1 -. a.1 } *. { b.1 -. a.1 }
+  }
+
+  let closest =
+    list.max(points, fn(p1, p2) { float.compare(dst(p0, p2), dst(p0, p1)) })
+  let closest_backup =
+    list.max(backup, fn(p1, p2) { float.compare(dst(p0, p2), dst(p0, p1)) })
+
+  result.unwrap(
+    result.try(closest, fn(p1) {
+      case dst(p0, p1) <. 12.0 *. 12.0 {
+        True -> Ok(p1)
+        False -> Error(Nil)
+      }
+    }),
+    result.unwrap(closest_backup, p0),
+  )
 }
 
 pub fn update(state: Paper, event: event.Event) -> Paper {
   case event, state {
+    event.KeyboardPressed(event.KeyShift), _ -> Paper(..state, shift: True)
+    event.KeyboardReleased(event.KeyShift), _ -> Paper(..state, shift: False)
     event.KeyboardPressed(event.KeyBackspace),
       Paper(layers: [_, previous, ..rest], ..)
     -> Paper(..state, layers: [previous, ..rest])
     event.KeyboardPressed(event.KeySpace), Paper(layers: [layer, ..rest], ..) ->
       Paper(..state, layers: [l.align(l.center(layer), 4), ..rest])
-    event.MouseMoved(x, y), _ ->
-      Paper(..state, mouse: #(
-        x -. canvas_width() /. 2.0,
-        y -. canvas_height() /. 2.0,
-      ))
-    event.MousePressed(event.MouseButtonLeft), _ ->
-      Paper(..state, line: Some(state.mouse))
+    event.MouseMoved(x, y), Paper(shift:, line:, layers: [layer, ..], ..) -> {
+      let mouse = #(x -. canvas_width() /. 2.0, y -. canvas_height() /. 2.0)
+      let mouse = case shift, line {
+        True, Some(start) -> {
+          let dirs = [
+            #(1.0, 0.0),
+            #(1.0, 1.0),
+            #(0.0, 1.0),
+            #(-1.0, 1.0),
+          ]
+
+          let line_snaps =
+            list.map(dirs, fn(dir) {
+              line_intersection(
+                points2line(start, #(start.0 +. dir.0, start.1 +. dir.1)),
+                points2line(mouse, #(mouse.0 -. dir.1, mouse.1 +. dir.0)),
+              )
+            })
+
+          snap(mouse, l.points(layer, True), line_snaps)
+        }
+        _, _ -> mouse
+      }
+      Paper(..state, mouse:)
+    }
+    event.MousePressed(event.MouseButtonLeft),
+      Paper(shift:, mouse:, layers: [layer, ..], ..)
+    ->
+      Paper(
+        ..state,
+        line: Some(case shift {
+          True -> snap(mouse, l.points(layer, True), [])
+          False -> mouse
+        }),
+      )
     event.MouseReleased(event.MouseButtonLeft),
-      Paper(mouse:, line: Some(start), layers: [layer, ..rest])
+      Paper(mouse:, line: Some(start), layers: [layer, ..rest], ..)
     -> {
       let fold_line = points2line(start, mouse)
       Paper(..state, line: None, layers: [
