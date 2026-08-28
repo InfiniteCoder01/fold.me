@@ -1,0 +1,159 @@
+import gleam/javascript/array.{type Array}
+
+pub type RenderingContext2D
+
+@external(javascript, "./../../impl_canvas_bindings.mjs", "define_web_component")
+pub fn define_web_component() -> Nil
+
+// TODO: forward the timestamp from the callback
+@external(javascript, "./../../impl_canvas_bindings.mjs", "setup_request_animation_frame")
+pub fn setup_request_animation_frame(callback: fn(Float) -> Nil) -> Nil
+
+@external(javascript, "./../../impl_canvas_bindings.mjs", "get_rendering_context")
+pub fn get_rendering_context(selector: String) -> RenderingContext2D
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "setup_input_handler")
+pub fn setup_input_handler(event: String, callback: fn(event) -> Nil) -> Nil
+
+pub type KeyboardEvent
+
+@external(javascript, "./../../impl_canvas_bindings.mjs", "get_key_code")
+pub fn get_key_code(event: KeyboardEvent) -> Int
+
+pub type MouseEvent
+
+@external(javascript, "./../../impl_canvas_bindings.mjs", "mouse_pos")
+pub fn mouse_pos(ctx: RenderingContext2D, event: MouseEvent) -> #(Float, Float)
+
+@external(javascript, "./../../impl_canvas_bindings.mjs", "check_mouse_button")
+pub fn check_mouse_button(
+  event: MouseEvent,
+  previous_event: Result(MouseEvent, Nil),
+  button_index: Int,
+  check_pressed check_pressed: Bool,
+) -> Bool
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "get_width")
+pub fn get_width(ctx: RenderingContext2D) -> Float
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "get_height")
+pub fn get_height(ctx: RenderingContext2D) -> Float
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_global")
+pub fn set_global(state: state, id: String) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "get_global")
+pub fn get_global(id: String) -> Result(state, Nil)
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "reset")
+pub fn reset(ctx: RenderingContext2D) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "save")
+pub fn save(ctx: RenderingContext2D) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "restore")
+pub fn restore(ctx: RenderingContext2D) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "translate")
+pub fn translate(ctx: RenderingContext2D, x: Float, y: Float) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "scale")
+pub fn scale(ctx: RenderingContext2D, x: Float, y: Float) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "rotate")
+pub fn rotate(ctx: RenderingContext2D, radians: Float) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "reset_transform")
+pub fn reset_transform(ctx: RenderingContext2D) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_fill_colour")
+pub fn set_fill_colour(ctx: RenderingContext2D, css_colour: String) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_stroke_color")
+pub fn set_stroke_color(ctx: RenderingContext2D, css_color: String) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_line_width")
+pub fn set_line_width(ctx: RenderingContext2D, width: Float) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_line_dash")
+pub fn set_line_dash(ctx: RenderingContext2D, dashes: Array(Float)) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_image_smoothing_enabled")
+pub fn set_image_smoothing_enabled(ctx: RenderingContext2D, value: Bool) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "path")
+pub fn path(
+  ctx: RenderingContext2D,
+  add_segments: fn(RenderingContext2D) -> Nil,
+  fill: Bool,
+  stroke: Bool,
+) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "move_to")
+pub fn move_to(ctx: RenderingContext2D, x: Float, y: Float) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "line_to")
+pub fn line_to(ctx: RenderingContext2D, x: Float, y: Float) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "arc_centre")
+pub fn arc_centre(
+  ctx: RenderingContext2D,
+  x: Float,
+  y: Float,
+  radius: Float,
+  start_angle: Float,
+  end_angle: Float,
+  counterclockwise: Bool,
+) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "arc_corner")
+pub fn arc_corner(
+  ctx: RenderingContext2D,
+  x1: Float,
+  y1: Float,
+  x2: Float,
+  y2: Float,
+  radius: Float,
+) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "bezier_to")
+pub fn bezier_to(
+  ctx: RenderingContext2D,
+  cp1x: Float,
+  cp1y: Float,
+  cp2x: Float,
+  cp2y: Float,
+  x: Float,
+  y: Float,
+) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "text")
+pub fn text(ctx: RenderingContext2D, text: String, font: String) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_text_align")
+pub fn set_text_align(ctx: RenderingContext2D, value: String) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_text_baseline")
+pub fn set_text_baseline(ctx: RenderingContext2D, value: String) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "set_direction")
+pub fn set_direction(ctx: RenderingContext2D, value: String) -> Nil
+
+pub type JsImage
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "draw_image")
+pub fn draw_image(
+  ctx: RenderingContext2D,
+  image: JsImage,
+  width_px: Int,
+  height_px: Int,
+) -> Nil
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "image_from_query")
+pub fn image_from_query(selector: String) -> JsImage
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "image_from_src")
+pub fn image_from_src(src: String) -> JsImage
+
+@external(javascript, "../../impl_canvas_bindings.mjs", "on_image_load")
+pub fn on_image_load(image: JsImage, callback: fn() -> Nil) -> Nil
