@@ -10,7 +10,7 @@ pub type Event {
   /// Triggered when a key is pressed
   KeyboardPressed(Key)
   /// Triggered when a key is released
-  KeyboardRelased(Key)
+  KeyboardReleased(Key)
   /// Triggered when the mouse is moved. Contains
   /// the `x` and `y` value for the mouse position.
   MouseMoved(Float, Float)

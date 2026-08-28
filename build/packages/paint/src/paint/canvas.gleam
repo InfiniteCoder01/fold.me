@@ -376,7 +376,7 @@ pub fn interact(
     )
   }
   create_key_handler("keydown", event.KeyboardPressed)
-  create_key_handler("keyup", event.KeyboardRelased)
+  create_key_handler("keyup", event.KeyboardReleased)
 
   // Handle mouse movement
   impl_canvas.setup_input_handler(
